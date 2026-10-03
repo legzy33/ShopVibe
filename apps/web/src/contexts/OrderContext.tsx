@@ -5,6 +5,8 @@ import { Order, OrderStatus, CheckoutFormData, OrderSummary } from '../types/ord
 import { useCart } from './CartContext';
 import { useAuth } from './AuthContext';
 import { apiService } from '../services/api';
+import { useCurrency } from './CurrencyContext';
+import { BASE_CURRENCY, calculateOrderTotals, isSupportedCurrency } from '@shopvibe/shared';
 
 interface OrderContextType {
   orders: Order[];
@@ -50,6 +52,7 @@ const mapApiOrder = (order: ApiOrder): Order => ({
   tax: order.tax,
   shipping: order.shipping,
   total: order.total,
+  currency: isSupportedCurrency(order.currency) ? order.currency : BASE_CURRENCY,
   status: order.status.toLowerCase() as OrderStatus,
   paymentStatus: order.paymentStatus.toLowerCase() as 'pending' | 'completed' | 'failed' | 'refunded',
   paymentMethod: order.paymentMethod.toLowerCase() as 'stripe' | 'paypal' | 'apple_pay' | 'google_pay',
@@ -87,6 +90,7 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
   
   const { cart, refreshCart } = useCart();
   const { user, isAuthenticated } = useAuth();
+  const { currency, rate } = useCurrency();
   const [ordersPage, setOrdersPage] = useState(1);
   const [hasMoreOrders, setHasMoreOrders] = useState(false);
 
@@ -141,18 +145,15 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, user]);
 
+  // Preview of the order in the selected currency, using the same calculation
+  // the API runs when it creates the order
   const calculateOrderSummary = (): OrderSummary => {
-    const subtotal = cart.items.reduce((sum: number, item) => sum + (item.product.price * item.quantity), 0);
-    const tax = subtotal * 0.08; // 8% tax
-    const shipping = subtotal >= 50 ? 0 : 9.99; // Free shipping from £50
-    const total = subtotal + tax + shipping;
+    const { subtotal, tax, shipping, total } = calculateOrderTotals(
+      cart.items.map(item => ({ price: item.product.price, quantity: item.quantity })),
+      rate
+    );
 
-    return {
-      subtotal: Number(subtotal.toFixed(2)),
-      tax: Number(tax.toFixed(2)),
-      shipping: Number(shipping.toFixed(2)),
-      total: Number(total.toFixed(2))
-    };
+    return { subtotal, tax, shipping, total };
   };
 
   const createOrder = async (formData: CheckoutFormData): Promise<Order> => {
@@ -172,6 +173,7 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
         shippingAddress: formData.shippingAddress,
         billingAddress: formData.sameAsShipping ? formData.shippingAddress : formData.billingAddress,
         paymentMethod: formData.paymentMethod.toUpperCase(),
+        currency,
         notes: undefined
       });
 
@@ -192,6 +194,7 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
         tax: response.order.tax,
         shipping: response.order.shipping,
         total: response.order.total,
+        currency: isSupportedCurrency(response.order.currency) ? response.order.currency : BASE_CURRENCY,
         status: response.order.status.toLowerCase() as OrderStatus,
         paymentStatus: response.order.paymentStatus.toLowerCase() as 'pending' | 'completed' | 'failed' | 'refunded',
         paymentMethod: response.order.paymentMethod.toLowerCase() as 'stripe' | 'paypal' | 'apple_pay' | 'google_pay',

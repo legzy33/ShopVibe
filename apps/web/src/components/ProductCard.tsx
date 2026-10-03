@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Product } from '../types/product';
-import { formatPrice } from '@shopvibe/shared';
+import { useCurrency } from '../contexts/CurrencyContext';
 import { useCart } from '../contexts/CartContext';
 
 interface ProductCardProps {
@@ -12,6 +12,7 @@ interface ProductCardProps {
 
 export function ProductCard({ product, isZoomed, onClick, onRequireAuth }: ProductCardProps) {
   const { addToCart } = useCart()
+  const { formatFromBase } = useCurrency()
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const handleAddToCart = async (e: React.MouseEvent) => {
@@ -70,7 +71,7 @@ export function ProductCard({ product, isZoomed, onClick, onRequireAuth }: Produ
         
         <div className="flex items-center justify-between mb-3">
           <span className="text-2xl font-bold text-gray-900">
-            {formatPrice(product.price)}
+            {formatFromBase(product.price)}
           </span>
           
           {product.rating && (

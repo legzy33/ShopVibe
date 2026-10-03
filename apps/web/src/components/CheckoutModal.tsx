@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useOrder } from '../contexts/OrderContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
-import { formatPrice } from '@shopvibe/shared';
+import { SupportedCurrency, convertFromBase, formatPrice, roundMoney } from '@shopvibe/shared';
+import { useCurrency } from '../contexts/CurrencyContext';
 import { CheckoutFormData, ShippingAddress } from '../types/order';
 
 type AddressKind = 'shippingAddress' | 'billingAddress';
@@ -40,7 +41,15 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
   const { cart } = useCart();
   
   const [step, setStep] = useState<'form' | 'processing' | 'payment-initiated' | 'success'>('form');
-  const [paymentData, setPaymentData] = useState<{ orderId?: string; paymentId?: string; clientSecret?: string; approvalUrl?: string } | null>(null);
+  const [paymentData, setPaymentData] = useState<{ orderId?: string; paymentId?: string; clientSecret?: string; approvalUrl?: string; total?: number; currency?: SupportedCurrency } | null>(null);
+  const { currency, rate, refreshRates } = useCurrency();
+
+  // Use the latest rates whenever checkout opens, so the preview matches what the order will be priced at
+  useEffect(() => {
+    if (isOpen) {
+      refreshRates();
+    }
+  }, [isOpen, refreshRates]);
   const [formData, setFormData] = useState<CheckoutFormData>({
     email: user?.email || '',
     shippingAddress: { ...emptyAddress(), fullName: user?.name || '' },
@@ -129,7 +138,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
           orderId: order.id,
           paymentId: paymentResult.paymentId,
           clientSecret: paymentResult.clientSecret,
-          approvalUrl: paymentResult.approvalUrl
+          approvalUrl: paymentResult.approvalUrl,
+          // The amount and currency the server priced the order at
+          total: order.total,
+          currency: order.currency
         });
         setStep('payment-initiated');
       } else {
@@ -300,7 +312,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
                               <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                             </div>
                           </div>
-                          <p className="text-sm font-medium">{formatPrice(item.product.price * item.quantity)}</p>
+                          <p className="text-sm font-medium">{formatPrice(roundMoney(convertFromBase(item.product.price, rate) * item.quantity), currency)}</p>
                         </div>
                       ))}
                     </div>
@@ -308,19 +320,19 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
                     <div className="border-t border-gray-200 mt-4 pt-4 space-y-2">
                       <div className="flex justify-between text-sm">
                         <span>Subtotal</span>
-                        <span>{formatPrice(orderSummary.subtotal)}</span>
+                        <span>{formatPrice(orderSummary.subtotal, currency)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span>Tax</span>
-                        <span>{formatPrice(orderSummary.tax)}</span>
+                        <span>{formatPrice(orderSummary.tax, currency)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span>Shipping</span>
-                        <span>{orderSummary.shipping === 0 ? 'Free' : formatPrice(orderSummary.shipping)}</span>
+                        <span>{orderSummary.shipping === 0 ? 'Free' : formatPrice(orderSummary.shipping, currency)}</span>
                       </div>
                       <div className="flex justify-between font-semibold text-lg border-t border-gray-200 pt-2">
                         <span>Total</span>
-                        <span>{formatPrice(orderSummary.total)}</span>
+                        <span>{formatPrice(orderSummary.total, currency)}</span>
                       </div>
                     </div>
                   </div>
@@ -353,6 +365,9 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
                 <div className="bg-gray-50 rounded-lg p-4 mb-6">
                   <p className="text-sm text-gray-600 mb-2">Payment Details:</p>
                   <div className="space-y-1 text-left">
+                    {paymentData?.total !== undefined && paymentData.currency && (
+                      <p className="text-sm"><span className="font-medium">Amount to pay:</span> {formatPrice(paymentData.total, paymentData.currency)}</p>
+                    )}
                     <p className="text-sm"><span className="font-medium">Payment ID:</span> {paymentData?.paymentId}</p>
                     {paymentData?.clientSecret && (
                       <p className="text-sm"><span className="font-medium">Client Secret:</span> {paymentData.clientSecret.substring(0, 20)}...</p>
@@ -426,7 +441,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
                 disabled={isCheckingOut || cart.items.length === 0}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isCheckingOut ? 'Processing...' : `Place Order - ${formatPrice(orderSummary.total)}`}
+                {isCheckingOut ? 'Processing...' : `Place Order - ${formatPrice(orderSummary.total, currency)}`}
               </button>
             </div>
           )}

@@ -13,6 +13,7 @@ import { orderRoutes } from './routes/orders';
 import { reviewRoutes } from './routes/reviews';
 import { userRoutes } from './routes/users';
 import { paymentRoutes } from './routes/payments';
+import { currencyRoutes } from './routes/currency';
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
 
@@ -67,6 +68,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/currency', currencyRoutes);
 
 // Error handling middleware
 app.use(notFound);

@@ -73,6 +73,8 @@ model Order {
   paymentStatus     String   @default("PENDING")
   paymentMethod     String
   paymentIntentId   String?
+  currency          String   @default("GBP") // Currency the customer pays in
+  exchangeRate      Float    @default(1)     // Units of currency per 1 GBP when the order was priced
   subtotal          Float
   tax               Float
   shipping          Float
@@ -126,6 +128,14 @@ model Review {
 
   @@unique([userId, productId])
   @@map("reviews")
+}
+
+model ExchangeRate {
+  currency  String   @id
+  rate      Float    // Units of this currency per 1 GBP
+  fetchedAt DateTime
+
+  @@map("exchange_rates")
 }
 
 // SQLite doesn't support enums, so we use strings instead

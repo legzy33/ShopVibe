@@ -1,3 +1,5 @@
+import { SupportedCurrency } from '@shopvibe/shared';
+
 export type OrderStatus = 
   | 'pending' 
   | 'confirmed' 
@@ -52,6 +54,8 @@ export interface Order {
   tax: number;
   shipping: number;
   total: number;
+  // Currency the order was priced and charged in; all amounts above are in it
+  currency: SupportedCurrency;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;

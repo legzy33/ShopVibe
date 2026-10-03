@@ -1,7 +1,8 @@
 'use client'
 
 import { useCart } from '../contexts/CartContext'
-import { formatPrice } from '@shopvibe/shared'
+import { calculateOrderTotals, formatPrice } from '@shopvibe/shared'
+import { useCurrency } from '../contexts/CurrencyContext'
 
 interface CartSidebarProps {
   onCheckoutOpen?: () => void
@@ -9,6 +10,13 @@ interface CartSidebarProps {
 
 export function CartSidebar({ onCheckoutOpen }: CartSidebarProps = {}) {
   const { cart, isOpen, closeCart, removeFromCart, updateCartItem, error, clearError } = useCart()
+  const { currency, rate } = useCurrency()
+
+  // Same calculation the API uses when the order is created, in the selected currency
+  const totals = calculateOrderTotals(
+    cart.items.map(item => ({ price: item.product.price, quantity: item.quantity })),
+    rate
+  )
 
   if (!isOpen) return null
 
@@ -74,7 +82,7 @@ export function CartSidebar({ onCheckoutOpen }: CartSidebarProps = {}) {
           ) : (
             /* Cart Items */
             <div className="p-4 space-y-4">
-              {cart.items.map((item) => (
+              {cart.items.map((item, index) => (
                 <div key={item.id} className="flex gap-4 border-b pb-4">
                   {/* Product Image */}
                   <img
@@ -120,9 +128,9 @@ export function CartSidebar({ onCheckoutOpen }: CartSidebarProps = {}) {
                       </div>
                       
                       <div className="text-right">
-                        <div className="font-medium">{formatPrice(item.product.price * item.quantity)}</div>
+                        <div className="font-medium">{formatPrice(totals.lines[index].lineTotal, currency)}</div>
                         {item.quantity > 1 && (
-                          <div className="text-xs text-gray-500">{formatPrice(item.product.price)} each</div>
+                          <div className="text-xs text-gray-500">{formatPrice(totals.lines[index].unitPrice, currency)} each</div>
                         )}
                       </div>
                     </div>
@@ -147,9 +155,9 @@ export function CartSidebar({ onCheckoutOpen }: CartSidebarProps = {}) {
         {cart.items.length > 0 && (
           <div className="border-t p-4 space-y-4">
             {/* Shipping Notice */}
-            {cart.subtotal < 50 && (
+            {totals.amountToFreeShipping > 0 && (
               <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-md">
-                Add {formatPrice(50 - cart.subtotal)} more for free shipping!
+                Add {formatPrice(totals.amountToFreeShipping, currency)} more for free shipping!
               </div>
             )}
             
@@ -157,19 +165,19 @@ export function CartSidebar({ onCheckoutOpen }: CartSidebarProps = {}) {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span>Subtotal</span>
-                <span>{formatPrice(cart.subtotal)}</span>
+                <span>{formatPrice(totals.subtotal, currency)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Shipping</span>
-                <span>{cart.shipping === 0 ? 'Free' : formatPrice(cart.shipping)}</span>
+                <span>{totals.shipping === 0 ? 'Free' : formatPrice(totals.shipping, currency)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Tax</span>
-                <span>{formatPrice(cart.tax)}</span>
+                <span>{formatPrice(totals.tax, currency)}</span>
               </div>
               <div className="flex justify-between font-medium text-base border-t pt-2">
                 <span>Total</span>
-                <span>{formatPrice(cart.total)}</span>
+                <span>{formatPrice(totals.total, currency)}</span>
               </div>
             </div>
 

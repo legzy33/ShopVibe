@@ -338,6 +338,8 @@ class ApiService {
         paymentStatus: string;
         paymentMethod: string;
         paymentIntentId: string | null;
+        currency: string;
+        exchangeRate: number;
         subtotal: number;
         tax: number;
         shipping: number;
@@ -390,6 +392,8 @@ class ApiService {
         paymentStatus: string;
         paymentMethod: string;
         paymentIntentId: string | null;
+        currency: string;
+        exchangeRate: number;
         subtotal: number;
         tax: number;
         shipping: number;
@@ -428,6 +432,7 @@ class ApiService {
     shippingAddress: any;
     billingAddress: any;
     paymentMethod: string;
+    currency?: string;
     notes?: string;
   }) {
     return this.request<{
@@ -440,6 +445,8 @@ class ApiService {
         status: string;
         paymentStatus: string;
         paymentMethod: string;
+        currency: string;
+        exchangeRate: number;
         subtotal: number;
         tax: number;
         shipping: number;
@@ -667,6 +674,16 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify({ orderId, amount, reason }),
     });
+  }
+
+  // Currency API methods
+  async getExchangeRates() {
+    return this.request<{
+      success: boolean;
+      base: string;
+      rates: { GBP?: number; EUR?: number; USD?: number };
+      fetchedAt: string | null;
+    }>('/api/currency/rates');
   }
 
   // Health check

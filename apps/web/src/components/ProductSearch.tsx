@@ -1,5 +1,7 @@
 'use client'
 
+import { CURRENCY_SYMBOLS } from '@shopvibe/shared'
+import { useCurrency } from '../contexts/CurrencyContext'
 import { useState, useEffect, useMemo } from 'react'
 import { useCategories } from '../hooks/useProducts'
 
@@ -37,6 +39,7 @@ export function ProductSearch({ onFiltersChanged }: ProductSearchProps) {
   })
 
   const [showFilters, setShowFilters] = useState(false)
+  const { currency } = useCurrency()
   const { categories, loading: categoriesLoading } = useCategories()
 
   // Convert internal filters to API format and notify parent
@@ -166,7 +169,7 @@ export function ProductSearch({ onFiltersChanged }: ProductSearchProps) {
               </label>
               <div className="flex gap-2 items-center">
                 <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">£</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">{CURRENCY_SYMBOLS[currency]}</span>
                   <input
                     type="number"
                     placeholder="Min"
@@ -177,7 +180,7 @@ export function ProductSearch({ onFiltersChanged }: ProductSearchProps) {
                 </div>
                 <span className="text-gray-400">-</span>
                 <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">£</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">{CURRENCY_SYMBOLS[currency]}</span>
                   <input
                     type="number"
                     placeholder="Max"

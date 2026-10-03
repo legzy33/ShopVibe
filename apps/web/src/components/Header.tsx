@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import CurrencySelector from './CurrencySelector'
 import { useCart } from '../contexts/CartContext'
 
 interface HeaderProps {
@@ -46,6 +47,7 @@ export function Header({ onAuthModalOpen, onOrderHistoryOpen }: HeaderProps) {
           {/* Right side - Currency, Auth & Cart */}
           <div className="flex items-center space-x-4">
             {/* Currency Selector */}
+            <CurrencySelector />
             {isAuthenticated ? (
               /* User Menu */
               <div className="relative">

@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { BASE_CURRENCY, calculateOrderTotals } from '@shopvibe/shared';
 import { prisma } from '../config/database';
 import { authenticate } from '../middleware/auth';
 
@@ -41,10 +42,10 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
       orderBy: { createdAt: 'desc' }
     });
 
-    // Calculate cart totals
-    const subtotal = cartItems.reduce((sum, item) => {
-      return sum + (item.product.price * item.quantity);
-    }, 0);
+    // Cart totals are in the base currency; the storefront converts for display
+    const totals = calculateOrderTotals(
+      cartItems.map(item => ({ price: item.product.price, quantity: item.quantity }))
+    );
 
     const itemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -63,10 +64,11 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
         })),
         summary: {
           itemCount,
-          subtotal,
-          tax: subtotal * 0.08, // 8% tax
-          shipping: subtotal >= 50 ? 0 : 9.99, // Free shipping from £50
-          total: subtotal + (subtotal * 0.08) + (subtotal >= 50 ? 0 : 9.99)
+          currency: BASE_CURRENCY,
+          subtotal: totals.subtotal,
+          tax: totals.tax,
+          shipping: totals.shipping,
+          total: totals.total
         }
       }
     });

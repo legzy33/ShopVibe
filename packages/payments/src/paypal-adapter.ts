@@ -21,7 +21,7 @@ export class PayPalAdapter implements PaymentService {
         purchase_units: [{
           amount: {
             currency_code: params.currency.toUpperCase(),
-            value: params.amount.toString(),
+            value: params.amount.toFixed(2),
           },
           custom_id: params.cartId,
           reference_id: params.customerId || '',
@@ -101,8 +101,8 @@ export class PayPalAdapter implements PaymentService {
       request.requestBody({
         amount: {
           // PayPal refunds must be in the same currency as the original payment
-          currency_code: (params.currency || 'GBP').toUpperCase(),
-          value: params.amount.toString(),
+          currency_code: params.currency.toUpperCase(),
+          value: params.amount.toFixed(2),
         },
         note_to_payer: params.reason || 'Customer requested refund',
       })

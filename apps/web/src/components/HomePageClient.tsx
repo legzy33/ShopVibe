@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from '../contexts/AuthContext'
 import { CartProvider } from '../contexts/CartContext'
 import { OrderProvider } from '../contexts/OrderContext'
 import { ReviewProvider } from '../contexts/ReviewContext'
+import { CurrencyProvider, useCurrency } from '../contexts/CurrencyContext'
 import { useProducts } from '../hooks/useProducts'
 import { Hero } from './Hero'
 import { Footer } from './Footer'
@@ -39,7 +40,13 @@ function HomeContent({ initialProducts }: HomePageClientProps) {
     sortOrder?: 'asc' | 'desc';
   }>({})
   const [page, setPage] = useState(1)
-  const { products, loading, error, pagination } = useProducts({ ...searchFilters, page }, initialProducts)
+  const { rate } = useCurrency()
+  // Price filters are typed in the selected currency, but the API filters on base-currency prices
+  const toBasePrice = (value?: number) => (value === undefined ? undefined : Math.round((value / rate) * 100) / 100)
+  const { products, loading, error, pagination } = useProducts(
+    { ...searchFilters, minPrice: toBasePrice(searchFilters.minPrice), maxPrice: toBasePrice(searchFilters.maxPrice), page },
+    initialProducts
+  )
 
   // A new search or filter starts again from the first page
   const handleFiltersChanged = useCallback((filters: typeof searchFilters) => {
@@ -306,13 +313,15 @@ function HomeContent({ initialProducts }: HomePageClientProps) {
 export default function HomePageClient({ initialProducts }: HomePageClientProps) {
   return (
     <AuthProvider>
-      <CartProvider>
-        <OrderProvider>
-          <ReviewProvider>
-            <HomeContent initialProducts={initialProducts} />
-          </ReviewProvider>
-        </OrderProvider>
-      </CartProvider>
+      <CurrencyProvider>
+        <CartProvider>
+          <OrderProvider>
+            <ReviewProvider>
+              <HomeContent initialProducts={initialProducts} />
+            </ReviewProvider>
+          </OrderProvider>
+        </CartProvider>
+      </CurrencyProvider>
     </AuthProvider>
   )
 }

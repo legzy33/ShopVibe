@@ -104,7 +104,7 @@ const OrderHistory: React.FC = () => {
               <div>
                 <h4 className="text-lg font-semibold">Order {order.id}</h4>
                 <p className="text-sm text-gray-600">
-                  Placed on {order.createdAt.toLocaleDateString()} • Total: {formatPrice(order.total)}
+                  Placed on {order.createdAt.toLocaleDateString()} • Total: {formatPrice(order.total, order.currency)}
                 </p>
               </div>
               
@@ -137,7 +137,7 @@ const OrderHistory: React.FC = () => {
                   <div className="flex-1">
                     <h5 className="font-medium">{item.productName}</h5>
                     <p className="text-sm text-gray-600">
-                      Quantity: {item.quantity} • {formatPrice(item.price)} each
+                      Quantity: {item.quantity} • {formatPrice(item.price, order.currency)} each
                     </p>
                     {item.variant && (
                       <p className="text-sm text-gray-500">
@@ -147,7 +147,7 @@ const OrderHistory: React.FC = () => {
                     )}
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">{formatPrice(item.price * item.quantity)}</p>
+                    <p className="font-medium">{formatPrice(item.price * item.quantity, order.currency)}</p>
                   </div>
                 </div>
               ))}
@@ -169,19 +169,19 @@ const OrderHistory: React.FC = () => {
                 <div className="text-sm space-y-1">
                   <div className="flex justify-between">
                     <span>Subtotal:</span>
-                    <span>{formatPrice(order.subtotal)}</span>
+                    <span>{formatPrice(order.subtotal, order.currency)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Tax:</span>
-                    <span>{formatPrice(order.tax)}</span>
+                    <span>{formatPrice(order.tax, order.currency)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Shipping:</span>
-                    <span>{order.shipping === 0 ? 'Free' : formatPrice(order.shipping)}</span>
+                    <span>{order.shipping === 0 ? 'Free' : formatPrice(order.shipping, order.currency)}</span>
                   </div>
                   <div className="flex justify-between font-medium border-t border-gray-200 pt-1">
                     <span>Total:</span>
-                    <span>{formatPrice(order.total)}</span>
+                    <span>{formatPrice(order.total, order.currency)}</span>
                   </div>
                 </div>
               </div>

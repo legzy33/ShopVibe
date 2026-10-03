@@ -1,11 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { calculateOrderTotals, SUPPORTED_CURRENCIES } from '@shopvibe/shared';
 import { prisma } from '../config/database';
 import { authenticate, requireAdmin } from '../middleware/auth';
+import { getExchangeRate } from '../services/exchangeRates';
 
 const router = Router();
-
-const roundCurrency = (value: number) => Number(value.toFixed(2));
 
 // Validation schemas
 const addressSchema = z.object({
@@ -22,6 +22,7 @@ const createOrderSchema = z.object({
   shippingAddress: addressSchema,
   billingAddress: addressSchema,
   paymentMethod: z.enum(['STRIPE', 'PAYPAL', 'APPLE_PAY', 'GOOGLE_PAY']),
+  currency: z.enum(SUPPORTED_CURRENCIES).optional().default('GBP'),
   notes: z.string().optional()
 });
 
@@ -175,7 +176,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
 router.post('/', authenticate, async (req: Request, res: Response, next: NextFunction): Promise<any> => {
   try {
     const user = (req as any).user;
-    const { shippingAddress, billingAddress, paymentMethod, notes } = createOrderSchema.parse(req.body);
+    const { shippingAddress, billingAddress, paymentMethod, currency, notes } = createOrderSchema.parse(req.body);
 
     // Get user's cart items
     const cartItems = await prisma.cartItem.findMany({
@@ -201,34 +202,42 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
       });
     }
 
-    // Calculate order totals
-    const subtotal = cartItems.reduce((sum, item) => {
-      return sum + (item.product.price * item.quantity);
-    }, 0);
+    // Price the order in the customer's currency at the current rate. The rate
+    // is saved on the order so the amount charged never moves afterwards.
+    const exchangeRate = await getExchangeRate(currency);
 
-    const roundedSubtotal = roundCurrency(subtotal);
-    const tax = roundCurrency(roundedSubtotal * 0.08); // 8% tax
-    const shipping = roundCurrency(roundedSubtotal >= 50 ? 0 : 9.99); // Free shipping from £50
-    const total = roundCurrency(roundedSubtotal + tax + shipping);
+    if (exchangeRate === null) {
+      return res.status(503).json({
+        error: 'Currency unavailable',
+        message: `Payment in ${currency} is temporarily unavailable. Please pay in GBP or try again later.`
+      });
+    }
+
+    const totals = calculateOrderTotals(
+      cartItems.map(item => ({ price: item.product.price, quantity: item.quantity })),
+      exchangeRate
+    );
 
     const orderData = {
       status: 'PENDING', // Will be updated to CONFIRMED after payment verification
       paymentStatus: 'PENDING', // Will be updated after payment
       paymentMethod,
-      subtotal: roundedSubtotal,
-      tax,
-      shipping,
-      total,
+      currency,
+      exchangeRate,
+      subtotal: totals.subtotal,
+      tax: totals.tax,
+      shipping: totals.shipping,
+      total: totals.total,
       shippingAddress: JSON.stringify(shippingAddress),
       billingAddress: JSON.stringify(billingAddress),
       notes: notes || null,
       items: {
-        create: cartItems.map(item => ({
+        create: cartItems.map((item, index) => ({
           productId: item.productId,
           productName: item.product.name,
           productImage: item.product.imageUrl,
           quantity: item.quantity,
-          price: item.product.price,
+          price: totals.lines[index].unitPrice, // in the order's currency
           variant: item.variant
         }))
       }

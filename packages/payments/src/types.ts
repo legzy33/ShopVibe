@@ -28,7 +28,7 @@ export interface CapturePaymentResponse {
 export interface RefundPaymentParams {
   transactionId: string
   amount: number
-  currency?: string
+  currency: string
   reason?: string
 }
 
