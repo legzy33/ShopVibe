@@ -1,8 +1,7 @@
 'use client'
 
 import { useCart } from '../contexts/CartContext'
-import { formatPriceWithConversion } from '@shopvibe/shared'
-import { useCurrency } from '../contexts/CurrencyContext'
+import { formatPrice } from '@shopvibe/shared'
 
 interface CartSidebarProps {
   onCheckoutOpen?: () => void
@@ -10,7 +9,6 @@ interface CartSidebarProps {
 
 export function CartSidebar({ onCheckoutOpen }: CartSidebarProps = {}) {
   const { cart, isOpen, closeCart, removeFromCart, updateCartItem, error, clearError } = useCart()
-  const { currency } = useCurrency()
 
   if (!isOpen) return null
 
@@ -122,9 +120,9 @@ export function CartSidebar({ onCheckoutOpen }: CartSidebarProps = {}) {
                       </div>
                       
                       <div className="text-right">
-                        <div className="font-medium">{formatPriceWithConversion(item.product.price * item.quantity, 'USD', currency)}</div>
+                        <div className="font-medium">{formatPrice(item.product.price * item.quantity)}</div>
                         {item.quantity > 1 && (
-                          <div className="text-xs text-gray-500">{formatPriceWithConversion(item.product.price, 'USD', currency)} each</div>
+                          <div className="text-xs text-gray-500">{formatPrice(item.product.price)} each</div>
                         )}
                       </div>
                     </div>
@@ -151,7 +149,7 @@ export function CartSidebar({ onCheckoutOpen }: CartSidebarProps = {}) {
             {/* Shipping Notice */}
             {cart.subtotal < 50 && (
               <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-md">
-                Add {formatPriceWithConversion(50 - cart.subtotal, 'USD', currency)} more for free shipping!
+                Add {formatPrice(50 - cart.subtotal)} more for free shipping!
               </div>
             )}
             
@@ -159,19 +157,19 @@ export function CartSidebar({ onCheckoutOpen }: CartSidebarProps = {}) {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span>Subtotal</span>
-                <span>{formatPriceWithConversion(cart.subtotal, 'USD', currency)}</span>
+                <span>{formatPrice(cart.subtotal)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Shipping</span>
-                <span>{cart.shipping === 0 ? 'Free' : formatPriceWithConversion(cart.shipping, 'USD', currency)}</span>
+                <span>{cart.shipping === 0 ? 'Free' : formatPrice(cart.shipping)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Tax</span>
-                <span>{formatPriceWithConversion(cart.tax, 'USD', currency)}</span>
+                <span>{formatPrice(cart.tax)}</span>
               </div>
               <div className="flex justify-between font-medium text-base border-t pt-2">
                 <span>Total</span>
-                <span>{formatPriceWithConversion(cart.total, 'USD', currency)}</span>
+                <span>{formatPrice(cart.total)}</span>
               </div>
             </div>
 

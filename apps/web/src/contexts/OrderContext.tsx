@@ -144,7 +144,7 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
   const calculateOrderSummary = (): OrderSummary => {
     const subtotal = cart.items.reduce((sum: number, item) => sum + (item.product.price * item.quantity), 0);
     const tax = subtotal * 0.08; // 8% tax
-    const shipping = subtotal >= 50 ? 0 : 9.99; // Free shipping from $50
+    const shipping = subtotal >= 50 ? 0 : 9.99; // Free shipping from £50
     const total = subtotal + tax + shipping;
 
     return {

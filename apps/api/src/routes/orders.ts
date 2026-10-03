@@ -12,8 +12,8 @@ const addressSchema = z.object({
   fullName: z.string().min(1, 'Full name is required'),
   street: z.string().min(1, 'Street address is required'),
   city: z.string().min(1, 'City is required'),
-  state: z.string().min(1, 'State is required'),
-  zipCode: z.string().min(1, 'ZIP code is required'),
+  state: z.string().optional().default(''), // County is optional for UK addresses
+  zipCode: z.string().min(1, 'Postcode is required'),
   country: z.string().min(2, 'Country is required'),
   phone: z.string().min(1, 'Phone number is required')
 });
@@ -208,7 +208,7 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
 
     const roundedSubtotal = roundCurrency(subtotal);
     const tax = roundCurrency(roundedSubtotal * 0.08); // 8% tax
-    const shipping = roundCurrency(roundedSubtotal >= 50 ? 0 : 9.99); // Free shipping from $50
+    const shipping = roundCurrency(roundedSubtotal >= 50 ? 0 : 9.99); // Free shipping from £50
     const total = roundCurrency(roundedSubtotal + tax + shipping);
 
     const orderData = {

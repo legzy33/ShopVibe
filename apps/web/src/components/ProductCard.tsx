@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Product } from '../types/product';
-import { formatPriceWithConversion } from '@shopvibe/shared';
+import { formatPrice } from '@shopvibe/shared';
 import { useCart } from '../contexts/CartContext';
-import { useCurrency } from '../contexts/CurrencyContext';
 
 interface ProductCardProps {
   product: Product;
@@ -13,7 +12,6 @@ interface ProductCardProps {
 
 export function ProductCard({ product, isZoomed, onClick, onRequireAuth }: ProductCardProps) {
   const { addToCart } = useCart()
-  const { currency } = useCurrency()
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const handleAddToCart = async (e: React.MouseEvent) => {
@@ -72,7 +70,7 @@ export function ProductCard({ product, isZoomed, onClick, onRequireAuth }: Produ
         
         <div className="flex items-center justify-between mb-3">
           <span className="text-2xl font-bold text-gray-900">
-            {formatPriceWithConversion(product.price, 'USD', currency)}
+            {formatPrice(product.price)}
           </span>
           
           {product.rating && (

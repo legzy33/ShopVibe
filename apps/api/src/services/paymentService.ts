@@ -1,5 +1,6 @@
 import { StripeAdapter } from '@shopvibe/payments';
 import { PayPalAdapter } from '@shopvibe/payments';
+import { STORE_CURRENCY } from '@shopvibe/shared';
 import { prisma } from '../config/database';
 
 // Initialize payment adapters
@@ -68,7 +69,7 @@ export const initializePayment = async (
 
       const result = await stripeAdapter.createOrder({
         amount,
-        currency: currency || 'USD',
+        currency,
         cartId: orderId,
         customerId
       });
@@ -94,7 +95,7 @@ export const initializePayment = async (
 
       const result = await paypalAdapter.createOrder({
         amount,
-        currency: currency || 'USD',
+        currency,
         cartId: orderId,
         customerId
       });
@@ -271,6 +272,7 @@ export const refundPayment = async (
       refundResult = await paypalAdapter.refundPayment({
         transactionId: order.paymentIntentId,
         amount,
+        currency: STORE_CURRENCY,
         reason
       });
     } else {

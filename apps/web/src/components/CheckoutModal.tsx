@@ -4,8 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useOrder } from '../contexts/OrderContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
-import { useCurrency } from '../contexts/CurrencyContext';
-import { formatPriceWithConversion } from '@shopvibe/shared';
+import { formatPrice } from '@shopvibe/shared';
 import { CheckoutFormData, ShippingAddress } from '../types/order';
 
 type AddressKind = 'shippingAddress' | 'billingAddress';
@@ -16,16 +15,16 @@ const emptyAddress = (): ShippingAddress => ({
   city: '',
   state: '',
   zipCode: '',
-  country: 'US',
+  country: 'GB',
   phone: ''
 });
 
-const ADDRESS_FIELDS: Array<{ key: keyof ShippingAddress; label: string; type: string; autoComplete: string; wide?: boolean }> = [
+const ADDRESS_FIELDS: Array<{ key: keyof ShippingAddress; label: string; type: string; autoComplete: string; wide?: boolean; optional?: boolean }> = [
   { key: 'fullName', label: 'Full Name', type: 'text', autoComplete: 'name', wide: true },
   { key: 'street', label: 'Street Address', type: 'text', autoComplete: 'street-address', wide: true },
-  { key: 'city', label: 'City', type: 'text', autoComplete: 'address-level2' },
-  { key: 'state', label: 'State / Region', type: 'text', autoComplete: 'address-level1' },
-  { key: 'zipCode', label: 'ZIP / Postal Code', type: 'text', autoComplete: 'postal-code' },
+  { key: 'city', label: 'Town / City', type: 'text', autoComplete: 'address-level2' },
+  { key: 'state', label: 'County', type: 'text', autoComplete: 'address-level1', optional: true },
+  { key: 'zipCode', label: 'Postcode', type: 'text', autoComplete: 'postal-code' },
   { key: 'country', label: 'Country', type: 'text', autoComplete: 'country' },
   { key: 'phone', label: 'Phone', type: 'tel', autoComplete: 'tel', wide: true }
 ];
@@ -39,7 +38,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
   const { createOrder, processPayment, verifyPaymentCompletion, calculateOrderSummary, isCheckingOut } = useOrder();
   const { user } = useAuth();
   const { cart } = useCart();
-  const { currency } = useCurrency();
   
   const [step, setStep] = useState<'form' | 'processing' | 'payment-initiated' | 'success'>('form');
   const [paymentData, setPaymentData] = useState<{ orderId?: string; paymentId?: string; clientSecret?: string; approvalUrl?: string } | null>(null);
@@ -70,7 +68,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
   };
 
   const findMissingField = (kind: AddressKind): string | null => {
-    const missing = ADDRESS_FIELDS.find(field => !formData[kind][field.key]?.trim());
+    const missing = ADDRESS_FIELDS.find(field => !field.optional && !formData[kind][field.key]?.trim());
     return missing ? missing.label : null;
   };
 
@@ -90,7 +88,9 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {ADDRESS_FIELDS.map(field => (
         <div key={field.key} className={field.wide ? 'sm:col-span-2' : undefined}>
-          <label htmlFor={`${kind}-${field.key}`} className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
+          <label htmlFor={`${kind}-${field.key}`} className="block text-sm font-medium text-gray-700 mb-1">
+            {field.label}{field.optional && <span className="font-normal text-gray-500"> (optional)</span>}
+          </label>
           <input
             id={`${kind}-${field.key}`}
             type={field.type}
@@ -98,7 +98,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
             value={formData[kind][field.key] || ''}
             onChange={(e) => updateAddress(kind, field.key, e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            required
+            required={!field.optional}
           />
         </div>
       ))}
@@ -300,7 +300,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
                               <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                             </div>
                           </div>
-                          <p className="text-sm font-medium">{formatPriceWithConversion(item.product.price * item.quantity, 'USD', currency)}</p>
+                          <p className="text-sm font-medium">{formatPrice(item.product.price * item.quantity)}</p>
                         </div>
                       ))}
                     </div>
@@ -308,19 +308,19 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
                     <div className="border-t border-gray-200 mt-4 pt-4 space-y-2">
                       <div className="flex justify-between text-sm">
                         <span>Subtotal</span>
-                        <span>{formatPriceWithConversion(orderSummary.subtotal, 'USD', currency)}</span>
+                        <span>{formatPrice(orderSummary.subtotal)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span>Tax</span>
-                        <span>{formatPriceWithConversion(orderSummary.tax, 'USD', currency)}</span>
+                        <span>{formatPrice(orderSummary.tax)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span>Shipping</span>
-                        <span>{orderSummary.shipping === 0 ? 'Free' : formatPriceWithConversion(orderSummary.shipping, 'USD', currency)}</span>
+                        <span>{orderSummary.shipping === 0 ? 'Free' : formatPrice(orderSummary.shipping)}</span>
                       </div>
                       <div className="flex justify-between font-semibold text-lg border-t border-gray-200 pt-2">
                         <span>Total</span>
-                        <span>{formatPriceWithConversion(orderSummary.total, 'USD', currency)}</span>
+                        <span>{formatPrice(orderSummary.total)}</span>
                       </div>
                     </div>
                   </div>
@@ -426,7 +426,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
                 disabled={isCheckingOut || cart.items.length === 0}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isCheckingOut ? 'Processing...' : `Place Order - ${formatPriceWithConversion(orderSummary.total, 'USD', currency)}`}
+                {isCheckingOut ? 'Processing...' : `Place Order - ${formatPrice(orderSummary.total)}`}
               </button>
             </div>
           )}

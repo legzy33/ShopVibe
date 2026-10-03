@@ -100,7 +100,8 @@ export class PayPalAdapter implements PaymentService {
       request.prefer('return=representation')
       request.requestBody({
         amount: {
-          currency_code: 'USD', // PayPal refunds must be in the same currency as the original payment
+          // PayPal refunds must be in the same currency as the original payment
+          currency_code: (params.currency || 'GBP').toUpperCase(),
           value: params.amount.toString(),
         },
         note_to_payer: params.reason || 'Customer requested refund',

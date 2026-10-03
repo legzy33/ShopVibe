@@ -13,7 +13,6 @@ import { AuthProvider, useAuth } from '../contexts/AuthContext'
 import { CartProvider } from '../contexts/CartContext'
 import { OrderProvider } from '../contexts/OrderContext'
 import { ReviewProvider } from '../contexts/ReviewContext'
-import { CurrencyProvider } from '../contexts/CurrencyContext'
 import { useProducts } from '../hooks/useProducts'
 import { Hero } from './Hero'
 import { Footer } from './Footer'
@@ -307,15 +306,13 @@ function HomeContent({ initialProducts }: HomePageClientProps) {
 export default function HomePageClient({ initialProducts }: HomePageClientProps) {
   return (
     <AuthProvider>
-      <CurrencyProvider>
-        <CartProvider>
-          <OrderProvider>
-            <ReviewProvider>
-              <HomeContent initialProducts={initialProducts} />
-            </ReviewProvider>
-          </OrderProvider>
-        </CartProvider>
-      </CurrencyProvider>
+      <CartProvider>
+        <OrderProvider>
+          <ReviewProvider>
+            <HomeContent initialProducts={initialProducts} />
+          </ReviewProvider>
+        </OrderProvider>
+      </CartProvider>
     </AuthProvider>
   )
 }

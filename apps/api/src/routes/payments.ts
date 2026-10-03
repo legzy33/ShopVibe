@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { STORE_CURRENCY } from '@shopvibe/shared';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { clearPurchasedCartItems, initializePayment, verifyPayment, refundPayment } from '../services/paymentService';
 import { prisma } from '../config/database';
@@ -61,7 +62,7 @@ router.post('/create-intent', authenticate, async (req: Request, res: Response, 
     const paymentResult = await initializePayment({
       orderId: order.id,
       amount: order.total,
-      currency: 'USD',
+      currency: STORE_CURRENCY,
       paymentMethod,
       customerId: user.id
     });
@@ -136,7 +137,7 @@ router.post('/verify', authenticate, async (req: Request, res: Response, next: N
       paymentId,
       paymentMethod,
       expectedAmount: order.total,
-      expectedCurrency: 'USD'
+      expectedCurrency: STORE_CURRENCY
     });
 
     if (verificationResult.success) {

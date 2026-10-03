@@ -65,7 +65,7 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
           itemCount,
           subtotal,
           tax: subtotal * 0.08, // 8% tax
-          shipping: subtotal >= 50 ? 0 : 9.99, // Free shipping from $50
+          shipping: subtotal >= 50 ? 0 : 9.99, // Free shipping from £50
           total: subtotal + (subtotal * 0.08) + (subtotal >= 50 ? 0 : 9.99)
         }
       }

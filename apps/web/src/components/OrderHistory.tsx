@@ -3,14 +3,12 @@
 import React from 'react';
 import { useOrder } from '../contexts/OrderContext';
 import { useAuth } from '../contexts/AuthContext';
-import { useCurrency } from '../contexts/CurrencyContext';
-import { formatPriceWithConversion } from '@shopvibe/shared';
+import { formatPrice } from '@shopvibe/shared';
 import { OrderStatus } from '../types/order';
 
 const OrderHistory: React.FC = () => {
   const { getUserOrders, trackOrder, cancelOrder, hasMoreOrders, loadMoreOrders, isLoading } = useOrder();
   const { user } = useAuth();
-  const { currency } = useCurrency();
 
   const orders = getUserOrders(user?.id);
 
@@ -106,7 +104,7 @@ const OrderHistory: React.FC = () => {
               <div>
                 <h4 className="text-lg font-semibold">Order {order.id}</h4>
                 <p className="text-sm text-gray-600">
-                  Placed on {order.createdAt.toLocaleDateString()} • Total: {formatPriceWithConversion(order.total, 'USD', currency)}
+                  Placed on {order.createdAt.toLocaleDateString()} • Total: {formatPrice(order.total)}
                 </p>
               </div>
               
@@ -139,7 +137,7 @@ const OrderHistory: React.FC = () => {
                   <div className="flex-1">
                     <h5 className="font-medium">{item.productName}</h5>
                     <p className="text-sm text-gray-600">
-                      Quantity: {item.quantity} • ${item.price.toFixed(2)} each
+                      Quantity: {item.quantity} • {formatPrice(item.price)} each
                     </p>
                     {item.variant && (
                       <p className="text-sm text-gray-500">
@@ -149,7 +147,7 @@ const OrderHistory: React.FC = () => {
                     )}
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">${(item.price * item.quantity).toFixed(2)}</p>
+                    <p className="font-medium">{formatPrice(item.price * item.quantity)}</p>
                   </div>
                 </div>
               ))}
@@ -162,7 +160,7 @@ const OrderHistory: React.FC = () => {
                 <p className="text-sm text-gray-600">
                   {order.shippingAddress.fullName}<br />
                   {order.shippingAddress.street}<br />
-                  {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}
+                  {[order.shippingAddress.city, order.shippingAddress.state].filter(Boolean).join(', ')} {order.shippingAddress.zipCode}
                 </p>
               </div>
               
@@ -171,19 +169,19 @@ const OrderHistory: React.FC = () => {
                 <div className="text-sm space-y-1">
                   <div className="flex justify-between">
                     <span>Subtotal:</span>
-                    <span>${order.subtotal.toFixed(2)}</span>
+                    <span>{formatPrice(order.subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Tax:</span>
-                    <span>${order.tax.toFixed(2)}</span>
+                    <span>{formatPrice(order.tax)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Shipping:</span>
-                    <span>{order.shipping === 0 ? 'Free' : `$${order.shipping.toFixed(2)}`}</span>
+                    <span>{order.shipping === 0 ? 'Free' : formatPrice(order.shipping)}</span>
                   </div>
                   <div className="flex justify-between font-medium border-t border-gray-200 pt-1">
                     <span>Total:</span>
-                    <span>${order.total.toFixed(2)}</span>
+                    <span>{formatPrice(order.total)}</span>
                   </div>
                 </div>
               </div>
