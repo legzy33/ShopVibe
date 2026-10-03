@@ -11,6 +11,7 @@ import {
   isSupportedCurrency
 } from '@shopvibe/shared';
 import { apiService } from '../services/api';
+import { CURRENCY_COOKIE } from './currencyCookie';
 
 interface CurrencyContextType {
   currency: SupportedCurrency;
@@ -26,6 +27,11 @@ interface CurrencyContextType {
 
 const STORAGE_KEY = 'shopvibe_currency';
 
+const saveCurrency = (currency: SupportedCurrency) => {
+  localStorage.setItem(STORAGE_KEY, currency);
+  document.cookie = `${CURRENCY_COOKIE}=${currency}; path=/; max-age=31536000; samesite=lax`;
+};
+
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
 export const useCurrency = () => {
@@ -38,11 +44,14 @@ export const useCurrency = () => {
 
 interface CurrencyProviderProps {
   children: ReactNode;
+  // Read on the server from the visitor's cookie, with the rates current at render time
+  initialCurrency?: SupportedCurrency | null;
+  initialRates?: ExchangeRates | null;
 }
 
-export const CurrencyProvider: React.FC<CurrencyProviderProps> = ({ children }) => {
-  const [preferredCurrency, setPreferredCurrency] = useState<SupportedCurrency>(BASE_CURRENCY);
-  const [rates, setRates] = useState<ExchangeRates>({ [BASE_CURRENCY]: 1 });
+export const CurrencyProvider: React.FC<CurrencyProviderProps> = ({ children, initialCurrency, initialRates }) => {
+  const [preferredCurrency, setPreferredCurrency] = useState<SupportedCurrency>(initialCurrency || BASE_CURRENCY);
+  const [rates, setRates] = useState<ExchangeRates>({ ...initialRates, [BASE_CURRENCY]: 1 });
 
   const refreshRates = useCallback(async () => {
     try {
@@ -54,19 +63,24 @@ export const CurrencyProvider: React.FC<CurrencyProviderProps> = ({ children }) 
     }
   }, []);
 
-  // Load the saved preference and the current rates on mount
   useEffect(() => {
-    const savedCurrency = localStorage.getItem(STORAGE_KEY);
-    if (isSupportedCurrency(savedCurrency)) {
-      setPreferredCurrency(savedCurrency);
+    // A choice saved before the cookie existed lives only in localStorage; adopt it once
+    if (!initialCurrency) {
+      const savedCurrency = localStorage.getItem(STORAGE_KEY);
+      if (isSupportedCurrency(savedCurrency)) {
+        setPreferredCurrency(savedCurrency);
+        saveCurrency(savedCurrency);
+      }
     }
 
-    refreshRates();
-  }, [refreshRates]);
+    if (!initialRates) {
+      refreshRates();
+    }
+  }, [initialCurrency, initialRates, refreshRates]);
 
   const setCurrency = useCallback((newCurrency: SupportedCurrency) => {
     setPreferredCurrency(newCurrency);
-    localStorage.setItem(STORAGE_KEY, newCurrency);
+    saveCurrency(newCurrency);
   }, []);
 
   const value = useMemo<CurrencyContextType>(() => {

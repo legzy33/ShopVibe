@@ -1,4 +1,7 @@
+import { cookies } from 'next/headers'
+import { ExchangeRates, isSupportedCurrency } from '@shopvibe/shared'
 import HomePageClient from '../components/HomePageClient'
+import { CURRENCY_COOKIE } from '../contexts/currencyCookie'
 import { ApiProductListResponse, mapApiProduct } from '../services/productTransforms'
 import { Product } from '../types/product'
 
@@ -24,8 +27,31 @@ async function getInitialProducts(): Promise<Product[]> {
   }
 }
 
-export default async function Home() {
-  const initialProducts = await getInitialProducts()
+async function getInitialRates(): Promise<ExchangeRates | null> {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/api/currency/rates`, { cache: 'no-store' })
 
-  return <HomePageClient initialProducts={initialProducts} />
+    if (!response.ok) {
+      return null
+    }
+
+    const data = (await response.json()) as { rates: ExchangeRates }
+    return data.rates
+  } catch {
+    return null
+  }
+}
+
+export default async function Home() {
+  // Render prices in the visitor's saved currency from the first paint
+  const savedCurrency = cookies().get(CURRENCY_COOKIE)?.value
+  const [initialProducts, initialRates] = await Promise.all([getInitialProducts(), getInitialRates()])
+
+  return (
+    <HomePageClient
+      initialProducts={initialProducts}
+      initialCurrency={isSupportedCurrency(savedCurrency) ? savedCurrency : null}
+      initialRates={initialRates}
+    />
+  )
 }

@@ -125,7 +125,7 @@ async function main() {
       name: "Pour-Over Coffee Maker",
       description: "Glass coffee maker with a reusable stainless steel filter for the perfect brew.",
       price: 34.99,
-      imageUrl: "https://images.unsplash.com/photo-1544097935-e5976425e7f9?w=800&q=80",
+      imageUrl: "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=800&q=80",
       category: "home",
       inStock: true
     },

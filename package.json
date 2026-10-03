@@ -12,7 +12,7 @@
     "dev": "turbo run dev",
     "build": "npm run build:shared && npm run build:payments && npm run build:api && npm run build:web",
     "typecheck": "npm run typecheck:shared && npm run typecheck:payments && npm run typecheck:api && npm run typecheck:web",
-    "test": "npm run typecheck",
+    "test": "npm run typecheck && npm run test:unit",
     "lint": "npm run lint:web",
     "clean": "turbo run clean",
     "dev:web": "cd apps/web && next dev -p 3001",
@@ -26,7 +26,8 @@
     "typecheck:web": "cd apps/web && tsc --noEmit",
     "typecheck:payments": "cd packages/payments && tsc --noEmit",
     "typecheck:shared": "cd packages/shared && tsc --noEmit",
-    "lint:web": "cd apps/web && eslint . --ext .js,.jsx,.ts,.tsx"
+    "lint:web": "cd apps/web && eslint . --ext .js,.jsx,.ts,.tsx",
+    "test:unit": "npm run test -w api"
   },
   "devDependencies": {
     "turbo": "^1.10.16",

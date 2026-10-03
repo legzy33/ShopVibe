@@ -59,7 +59,7 @@ export const ReviewProvider: React.FC<ReviewProviderProps> = ({ children }) => {
         title: '', // Not provided by API
         content: review.comment || '',
         images: [], // Not provided by API
-        verified: true,
+        verified: review.verified,
         helpful: 0,
         notHelpful: 0,
         createdAt: new Date(review.createdAt),
@@ -93,7 +93,7 @@ export const ReviewProvider: React.FC<ReviewProviderProps> = ({ children }) => {
         totalReviews: response.statistics.totalReviews,
         ratingDistribution: response.statistics.ratingDistribution,
         recommendationPercentage: Math.round((response.statistics.ratingDistribution[4] + response.statistics.ratingDistribution[5]) / response.statistics.totalReviews * 100) || 0,
-        verifiedPurchases: response.statistics.totalReviews // Assume all are verified for now
+        verifiedPurchases: response.statistics.verifiedPurchases
       };
 
       setReviewSummaries(prev => ({
@@ -133,7 +133,7 @@ export const ReviewProvider: React.FC<ReviewProviderProps> = ({ children }) => {
         title: reviewData.title || '',
         content: response.review.comment || '',
         images: [],
-        verified: true,
+        verified: response.review.verified,
         helpful: 0,
         notHelpful: 0,
         createdAt: new Date(response.review.createdAt),

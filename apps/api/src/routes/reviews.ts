@@ -40,6 +40,21 @@ async function updateProductRating(productId: string) {
   });
 }
 
+// Users who have paid for an order containing the product
+async function getVerifiedBuyerIds(productId: string): Promise<Set<string>> {
+  const orders = await prisma.order.findMany({
+    where: {
+      paymentStatus: 'COMPLETED',
+      userId: { not: null },
+      items: { some: { productId } }
+    },
+    select: { userId: true },
+    distinct: ['userId']
+  });
+
+  return new Set(orders.map(order => order.userId as string));
+}
+
 // GET /api/reviews/product/:productId - Get all reviews for a product
 router.get('/product/:productId', async (req: Request, res: Response, next: NextFunction): Promise<any> => {
   try {
@@ -116,12 +131,19 @@ router.get('/product/:productId', async (req: Request, res: Response, next: Next
 
     const totalPages = Math.ceil(totalCount / limit);
 
+    // A review is verified only when its author has bought the product
+    const verifiedBuyerIds = await getVerifiedBuyerIds(productId);
+    const verifiedPurchases = verifiedBuyerIds.size === 0 ? 0 : await prisma.review.count({
+      where: { productId, userId: { in: [...verifiedBuyerIds] } }
+    });
+
     res.json({
       success: true,
-      data: reviews,
+      data: reviews.map(review => ({ ...review, verified: verifiedBuyerIds.has(review.userId) })),
       statistics: {
         averageRating: product.rating || 0,
         totalReviews: totalCount,
+        verifiedPurchases,
         ratingDistribution: distribution
       },
       pagination: {
@@ -205,10 +227,12 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
     // Update product rating
     await updateProductRating(productId);
 
+    const verifiedBuyerIds = await getVerifiedBuyerIds(productId);
+
     res.status(201).json({
       success: true,
       message: 'Review submitted successfully',
-      review
+      review: { ...review, verified: verifiedBuyerIds.has(user.id) }
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

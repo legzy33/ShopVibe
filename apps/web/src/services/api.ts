@@ -512,6 +512,7 @@ class ApiService {
         productId: string;
         rating: number;
         comment: string | null;
+        verified: boolean;
         createdAt: string;
         updatedAt: string;
         user: {
@@ -523,6 +524,7 @@ class ApiService {
       statistics: {
         averageRating: number;
         totalReviews: number;
+        verifiedPurchases: number;
         ratingDistribution: {
           1: number;
           2: number;
@@ -552,6 +554,7 @@ class ApiService {
         productId: string;
         rating: number;
         comment: string | null;
+        verified: boolean;
         createdAt: string;
         updatedAt: string;
         user: {

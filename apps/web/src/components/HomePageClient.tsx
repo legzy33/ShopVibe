@@ -18,12 +18,15 @@ import { useProducts } from '../hooks/useProducts'
 import { Hero } from './Hero'
 import { Footer } from './Footer'
 import { Product } from '../types/product'
+import { ExchangeRates, SupportedCurrency } from '@shopvibe/shared'
 
 interface HomePageClientProps {
   initialProducts: Product[]
+  initialCurrency?: SupportedCurrency | null
+  initialRates?: ExchangeRates | null
 }
 
-function HomeContent({ initialProducts }: HomePageClientProps) {
+function HomeContent({ initialProducts }: Pick<HomePageClientProps, 'initialProducts'>) {
   const { isAuthenticated } = useAuth()
   const [zoomedProduct, setZoomedProduct] = useState<string | null>(null)
   const [authModal, setAuthModal] = useState<{ isOpen: boolean; mode: 'login' | 'register' }>({
@@ -310,10 +313,10 @@ function HomeContent({ initialProducts }: HomePageClientProps) {
   )
 }
 
-export default function HomePageClient({ initialProducts }: HomePageClientProps) {
+export default function HomePageClient({ initialProducts, initialCurrency, initialRates }: HomePageClientProps) {
   return (
     <AuthProvider>
-      <CurrencyProvider>
+      <CurrencyProvider initialCurrency={initialCurrency} initialRates={initialRates}>
         <CartProvider>
           <OrderProvider>
             <ReviewProvider>

@@ -12,7 +12,8 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "tsx src/scripts/seed.ts"
+    "db:seed": "tsx src/scripts/seed.ts",
+    "test": "tsx --test src/tests/*.test.ts"
   },
   "dependencies": {
     "@shopvibe/shared": "*",
@@ -42,4 +43,4 @@
     "prisma": "^5.7.0",
     "@types/node": "^20.10.4"
   }
-} 
+}
