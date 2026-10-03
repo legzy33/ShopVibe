@@ -7,7 +7,8 @@ export type SupportedCurrency = typeof SUPPORTED_CURRENCIES[number];
 // Units of each currency per one unit of the base currency
 export type ExchangeRates = Partial<Record<SupportedCurrency, number>>;
 
-export const TAX_RATE = 0.08;
+export const TAX_RATE = 0.2; // UK VAT, added to the subtotal at checkout
+export const TAX_LABEL = `VAT (${TAX_RATE * 100}%)`;
 export const SHIPPING_FEE = 9.99; // in the base currency
 export const FREE_SHIPPING_THRESHOLD = 50; // in the base currency
 

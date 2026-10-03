@@ -172,7 +172,7 @@ const OrderHistory: React.FC = () => {
                     <span>{formatPrice(order.subtotal, order.currency)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Tax:</span>
+                    <span>VAT:</span>
                     <span>{formatPrice(order.tax, order.currency)}</span>
                   </div>
                   <div className="flex justify-between">

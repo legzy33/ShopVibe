@@ -6,21 +6,22 @@ test('totals in the base currency', () => {
   const totals = calculateOrderTotals([{ price: 24, quantity: 3 }, { price: 12.99, quantity: 3 }]);
 
   assert.equal(totals.subtotal, 110.97);
-  assert.equal(totals.tax, 8.88);
+  assert.equal(totals.tax, 22.19);
   assert.equal(totals.shipping, 0);
-  assert.equal(totals.total, 119.85);
+  assert.equal(totals.total, 133.16);
 });
 
 test('shipping is charged below the threshold and free from exactly 50', () => {
   const below = calculateOrderTotals([{ price: 49.99, quantity: 1 }]);
   assert.equal(below.shipping, 9.99);
   assert.equal(below.amountToFreeShipping, 0.01);
-  assert.equal(below.total, 63.98);
+  assert.equal(below.tax, 10);
+  assert.equal(below.total, 69.98);
 
   const exact = calculateOrderTotals([{ price: 25, quantity: 2 }]);
   assert.equal(exact.shipping, 0);
   assert.equal(exact.amountToFreeShipping, 0);
-  assert.equal(exact.total, 54);
+  assert.equal(exact.total, 60);
 });
 
 test('converted unit prices are rounded first so lines add up to the subtotal', () => {
@@ -30,8 +31,8 @@ test('converted unit prices are rounded first so lines add up to the subtotal', 
   assert.deepEqual(totals.lines.map(line => line.unitPrice), [28.22, 15.28]);
   assert.deepEqual(totals.lines.map(line => line.lineTotal), [84.66, 45.84]);
   assert.equal(totals.subtotal, 130.5);
-  assert.equal(totals.tax, 10.44);
-  assert.equal(totals.total, 140.94);
+  assert.equal(totals.tax, 26.1);
+  assert.equal(totals.total, 156.6);
 });
 
 test('free shipping is judged in the base currency, the fee is converted', () => {

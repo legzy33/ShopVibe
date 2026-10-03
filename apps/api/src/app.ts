@@ -14,6 +14,7 @@ import { reviewRoutes } from './routes/reviews';
 import { userRoutes } from './routes/users';
 import { paymentRoutes } from './routes/payments';
 import { currencyRoutes } from './routes/currency';
+import { handleStripeWebhook } from './services/paymentService';
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
 
@@ -45,6 +46,28 @@ const authLimiter = rateLimit({
   message: { error: 'Too many attempts, please try again later.' },
 });
 app.use('/api/auth', authLimiter);
+
+// Stripe webhook: needs the raw body to check the signature, so it sits before the JSON parser
+app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const signature = req.headers['stripe-signature'];
+
+  if (typeof signature !== 'string') {
+    return res.status(400).json({ error: 'Missing Stripe signature' });
+  }
+
+  try {
+    const handled = await handleStripeWebhook(req.body, signature);
+
+    if (!handled) {
+      return res.status(503).json({ error: 'Stripe webhooks are not configured' });
+    }
+
+    return res.json({ received: true });
+  } catch (error) {
+    console.error('Stripe webhook error:', error);
+    return res.status(400).json({ error: 'Invalid webhook' });
+  }
+});
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

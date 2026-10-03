@@ -4,9 +4,10 @@ import React, { useEffect, useState } from 'react';
 import { useOrder } from '../contexts/OrderContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
-import { SupportedCurrency, convertFromBase, formatPrice, roundMoney } from '@shopvibe/shared';
+import { SupportedCurrency, TAX_LABEL, convertFromBase, formatPrice, roundMoney } from '@shopvibe/shared';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { CheckoutFormData, ShippingAddress } from '../types/order';
+import StripePaymentForm from './StripePaymentForm';
 
 type AddressKind = 'shippingAddress' | 'billingAddress';
 
@@ -323,7 +324,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
                         <span>{formatPrice(orderSummary.subtotal, currency)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span>Tax</span>
+                        <span>{TAX_LABEL}</span>
                         <span>{formatPrice(orderSummary.tax, currency)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
@@ -348,7 +349,35 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
               </div>
             )}
 
-            {step === 'payment-initiated' && (
+            {step === 'payment-initiated' && formData.paymentMethod === 'stripe' && paymentData?.clientSecret && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Pay by card</h3>
+                  {paymentData.total !== undefined && paymentData.currency && (
+                    <p className="text-lg font-semibold">{formatPrice(paymentData.total, paymentData.currency)}</p>
+                  )}
+                </div>
+
+                {formError && (
+                  <div role="alert" className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3">
+                    {formError}
+                  </div>
+                )}
+
+                <StripePaymentForm
+                  clientSecret={paymentData.clientSecret}
+                  payLabel={
+                    paymentData.total !== undefined && paymentData.currency
+                      ? `Pay ${formatPrice(paymentData.total, paymentData.currency)}`
+                      : 'Pay now'
+                  }
+                  onPaid={handleConfirmPayment}
+                  onCancel={() => { setFormError(null); setStep('form'); }}
+                />
+              </div>
+            )}
+
+            {step === 'payment-initiated' && !(formData.paymentMethod === 'stripe' && paymentData?.clientSecret) && (
               <div className="text-center py-8">
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

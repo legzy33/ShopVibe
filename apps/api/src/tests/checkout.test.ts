@@ -50,8 +50,10 @@ before(async () => {
   process.env.TEST_DATABASE_URL = `file:${path.join(tempDir, 'test.db')}`;
   process.env.JWT_SECRET = 'test-secret';
   process.env.ADMIN_EMAILS = 'admin@example.com';
-  delete process.env.STRIPE_SECRET_KEY;
-  delete process.env.PAYPAL_CLIENT_ID;
+  // Left empty (not deleted) so the .env file cannot fill them in: tests never call the payment providers
+  process.env.STRIPE_SECRET_KEY = '';
+  process.env.PAYPAL_CLIENT_ID = '';
+  process.env.STRIPE_WEBHOOK_SECRET = '';
 
   // The exchange-rate service is replaced with fixed rates
   globalThis.fetch = (async (input: any, init?: any) => {
@@ -119,9 +121,9 @@ test('an order is priced in GBP by default', async () => {
   assert.equal(body.order.currency, 'GBP');
   assert.equal(body.order.exchangeRate, 1);
   assert.equal(body.order.subtotal, 25.98);
-  assert.equal(body.order.tax, 2.08);
+  assert.equal(body.order.tax, 5.2);
   assert.equal(body.order.shipping, 9.99);
-  assert.equal(body.order.total, 38.05);
+  assert.equal(body.order.total, 41.17);
   assert.equal(body.order.shippingAddress.state, ''); // county is optional
 });
 
@@ -135,9 +137,9 @@ test('checking out again reuses the unpaid order and reprices it in the chosen c
   assert.equal(body.order.exchangeRate, RATES.EUR);
   assert.equal(body.order.items[0].price, 15.59); // 12.99 * 1.2, rounded
   assert.equal(body.order.subtotal, 31.18);
-  assert.equal(body.order.tax, 2.49);
+  assert.equal(body.order.tax, 6.24);
   assert.equal(body.order.shipping, 11.99);
-  assert.equal(body.order.total, 45.66);
+  assert.equal(body.order.total, 49.41);
 
   assert.equal(await prisma.order.count(), 1);
   assert.equal(await prisma.orderItem.count(), 1);
@@ -152,7 +154,7 @@ test('the cart summary uses the same maths in the base currency', async () => {
   const { body } = await api('GET', '/api/cart');
   assert.deepEqual(
     { ...body.cart.summary },
-    { itemCount: 2, currency: 'GBP', subtotal: 25.98, tax: 2.08, shipping: 9.99, total: 38.05 }
+    { itemCount: 2, currency: 'GBP', subtotal: 25.98, tax: 5.2, shipping: 9.99, total: 41.17 }
   );
 });
 
@@ -169,6 +171,18 @@ test('a payment error leaves the order awaiting payment', async () => {
   const verify = await api('POST', '/api/payments/verify', { orderId: order.id, paymentId: 'pi_test', paymentMethod: 'STRIPE' });
   assert.equal(verify.status, 500);
   assert.equal((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus, 'PENDING');
+});
+
+test('the Stripe webhook refuses unsigned or unconfigured calls', async () => {
+  const unsigned = await realFetch(`${baseUrl}/api/payments/webhook`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  assert.equal(unsigned.status, 400);
+
+  const unconfigured = await realFetch(`${baseUrl}/api/payments/webhook`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'stripe-signature': 't=1,v1=bad' },
+    body: '{}'
+  });
+  assert.equal(unconfigured.status, 503);
 });
 
 test('refunds are for admins only', async () => {

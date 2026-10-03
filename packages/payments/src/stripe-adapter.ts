@@ -1,6 +1,13 @@
 import Stripe from 'stripe'
 import { PaymentService, CreateOrderParams, CreateOrderResponse, CapturePaymentParams, CapturePaymentResponse, RefundPaymentParams, RefundPaymentResponse } from './types'
 
+export interface StripeWebhookPayment {
+  paymentId: string
+  orderId: string
+  amount: number
+  currency: string
+}
+
 export class StripeAdapter implements PaymentService {
   private stripe: Stripe
 
@@ -15,8 +22,10 @@ export class StripeAdapter implements PaymentService {
       const paymentIntent = await this.stripe.paymentIntents.create({
         amount: Math.round(params.amount * 100), // Convert to cents
         currency: params.currency.toLowerCase(),
+        // Cards and wallets only: nothing that redirects away from the checkout
         automatic_payment_methods: {
           enabled: true,
+          allow_redirects: 'never',
         },
         metadata: {
           cartId: params.cartId,
@@ -71,6 +80,33 @@ export class StripeAdapter implements PaymentService {
     } catch (error) {
       console.error('Stripe capturePayment error:', error)
       throw new Error('Failed to capture Stripe payment')
+    }
+  }
+
+  // Stop an unpaid payment intent from being completed later
+  async cancelPayment(paymentId: string): Promise<void> {
+    const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentId)
+
+    if (['requires_payment_method', 'requires_confirmation', 'requires_action'].includes(paymentIntent.status)) {
+      await this.stripe.paymentIntents.cancel(paymentId)
+    }
+  }
+
+  // Check a webhook's signature and return the payment it reports, if it is one we act on
+  parseWebhookEvent(payload: Buffer, signature: string, webhookSecret: string): StripeWebhookPayment | null {
+    const event = this.stripe.webhooks.constructEvent(payload, signature, webhookSecret)
+
+    if (event.type !== 'payment_intent.succeeded') {
+      return null
+    }
+
+    const paymentIntent = event.data.object as Stripe.PaymentIntent
+
+    return {
+      paymentId: paymentIntent.id,
+      orderId: paymentIntent.metadata.cartId,
+      amount: paymentIntent.amount / 100,
+      currency: paymentIntent.currency.toUpperCase(),
     }
   }
 

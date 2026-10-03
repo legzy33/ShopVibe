@@ -4,6 +4,7 @@ import { calculateOrderTotals, SUPPORTED_CURRENCIES } from '@shopvibe/shared';
 import { prisma } from '../config/database';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { getExchangeRate } from '../services/exchangeRates';
+import { cancelPendingPayment } from '../services/paymentService';
 
 const router = Router();
 
@@ -273,6 +274,7 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
 
     if (unpaidOrder) {
       // The totals may have changed, so any earlier payment intent is dropped
+      await cancelPendingPayment(unpaidOrder);
       [, order] = await prisma.$transaction([
         prisma.orderItem.deleteMany({ where: { orderId: unpaidOrder.id } }),
         prisma.order.update({
@@ -425,6 +427,8 @@ router.post('/:id/cancel', authenticate, async (req: Request, res: Response, nex
         message: 'This order has been paid. Please contact support to cancel it and arrange a refund.'
       });
     }
+
+    await cancelPendingPayment(order);
 
     // Update order status to CANCELLED
     const cancelledOrder = await prisma.order.update({

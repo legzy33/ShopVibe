@@ -1,7 +1,7 @@
 'use client'
 
 import { useCart } from '../contexts/CartContext'
-import { calculateOrderTotals, formatPrice } from '@shopvibe/shared'
+import { TAX_LABEL, calculateOrderTotals, formatPrice } from '@shopvibe/shared'
 import { useCurrency } from '../contexts/CurrencyContext'
 
 interface CartSidebarProps {
@@ -172,7 +172,7 @@ export function CartSidebar({ onCheckoutOpen }: CartSidebarProps = {}) {
                 <span>{totals.shipping === 0 ? 'Free' : formatPrice(totals.shipping, currency)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Tax</span>
+                <span>{TAX_LABEL}</span>
                 <span>{formatPrice(totals.tax, currency)}</span>
               </div>
               <div className="flex justify-between font-medium text-base border-t pt-2">

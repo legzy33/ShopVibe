@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, requireAdmin } from '../middleware/auth';
-import { clearPurchasedCartItems, initializePayment, verifyPayment, refundPayment } from '../services/paymentService';
+import { initializePayment, verifyPayment, refundPayment } from '../services/paymentService';
 import { prisma } from '../config/database';
 
 const router = Router();
@@ -111,6 +111,16 @@ router.post('/verify', authenticate, async (req: Request, res: Response, next: N
       });
     }
 
+    // Already confirmed, for example by the Stripe webhook arriving first
+    if (order.paymentStatus === 'COMPLETED' && order.paymentIntentId === paymentId) {
+      return res.json({
+        success: true,
+        transactionId: paymentId,
+        amount: order.total,
+        message: 'Payment verified and order confirmed'
+      });
+    }
+
     if (order.status !== 'PENDING' || order.paymentStatus !== 'PENDING') {
       return res.status(400).json({
         error: 'Order is not awaiting payment',
@@ -140,8 +150,6 @@ router.post('/verify', authenticate, async (req: Request, res: Response, next: N
     });
 
     if (verificationResult.success) {
-      await clearPurchasedCartItems(orderId);
-
       res.json({
         success: true,
         transactionId: verificationResult.transactionId,

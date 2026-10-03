@@ -158,15 +158,7 @@ export const verifyPayment = async (
 
     // Update order status based on payment result
     if (captureResult.status === 'success') {
-      await prisma.order.update({
-        where: { id: orderId },
-        data: {
-          status: 'CONFIRMED',
-          paymentStatus: 'COMPLETED',
-          paymentIntentId: captureResult.transactionId,
-          updatedAt: new Date()
-        }
-      });
+      await confirmOrderPaid(orderId, captureResult.transactionId);
 
       return {
         success: true,
@@ -203,6 +195,71 @@ export const verifyPayment = async (
     console.error('Payment verification error:', error);
     throw error;
   }
+};
+
+// Mark an order as paid and empty the purchased items from the cart. Safe to
+// call twice: the checkout page and the Stripe webhook can both report a payment.
+export const confirmOrderPaid = async (orderId: string, transactionId: string): Promise<boolean> => {
+  const { count } = await prisma.order.updateMany({
+    where: { id: orderId, status: 'PENDING', paymentStatus: { in: ['PENDING', 'FAILED'] } },
+    data: {
+      status: 'CONFIRMED',
+      paymentStatus: 'COMPLETED',
+      paymentIntentId: transactionId,
+      updatedAt: new Date()
+    }
+  });
+
+  if (count > 0) {
+    await clearPurchasedCartItems(orderId);
+  }
+
+  return count > 0;
+};
+
+// Best effort: stop an abandoned payment from being completed at the provider
+export const cancelPendingPayment = async (order: { paymentMethod: string; paymentIntentId: string | null }): Promise<void> => {
+  if (!order.paymentIntentId || order.paymentMethod !== 'STRIPE' || !stripeAdapter) {
+    return;
+  }
+
+  try {
+    await stripeAdapter.cancelPayment(order.paymentIntentId);
+  } catch (error) {
+    console.warn('Could not cancel the pending payment:', error);
+  }
+};
+
+// Handle a Stripe webhook. Returns false when webhooks are not configured.
+export const handleStripeWebhook = async (payload: Buffer, signature: string): Promise<boolean> => {
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!stripeAdapter || !webhookSecret) {
+    return false;
+  }
+
+  // Throws when the signature does not match
+  const payment = stripeAdapter.parseWebhookEvent(payload, signature, webhookSecret);
+
+  if (!payment?.orderId) {
+    return true;
+  }
+
+  const order = await prisma.order.findUnique({ where: { id: payment.orderId } });
+
+  // Only confirm when the payment is the one this order is waiting for
+  if (
+    order &&
+    order.paymentIntentId === payment.paymentId &&
+    order.currency === payment.currency &&
+    Math.round(order.total * 100) === Math.round(payment.amount * 100)
+  ) {
+    await confirmOrderPaid(order.id, payment.paymentId);
+  } else {
+    console.warn(`Ignored Stripe payment ${payment.paymentId}: it does not match order ${payment.orderId}`);
+  }
+
+  return true;
 };
 
 export const clearPurchasedCartItems = async (orderId: string): Promise<void> => {
