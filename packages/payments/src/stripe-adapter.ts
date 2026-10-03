@@ -64,7 +64,7 @@ export class StripeAdapter implements PaymentService {
       }
 
       return {
-        status: 'failed',
+        status: paymentIntent.status === 'canceled' ? 'failed' : 'pending',
         transactionId: paymentIntent.id,
         amount: 0,
       }

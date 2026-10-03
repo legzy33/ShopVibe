@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { apiService } from '../services/api'
+import { apiService, ApiError } from '../services/api'
 import { AuthUser, LoginCredentials, RegisterCredentials } from '../types/user'
 
 interface UseAuthReturn {
@@ -47,8 +47,10 @@ export function useAuth(): UseAuthReturn {
         setUser(authUser)
       } catch (err) {
         console.error('Session check failed:', err)
-        // Clear invalid token
-        localStorage.removeItem('authToken')
+        // Only clear the token when the server rejects it; keep it if the API is just unreachable
+        if (err instanceof ApiError && err.status === 401) {
+          localStorage.removeItem('authToken')
+        }
         setUser(null)
       } finally {
         setIsLoading(false)

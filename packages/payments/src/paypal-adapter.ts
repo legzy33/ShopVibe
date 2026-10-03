@@ -79,8 +79,12 @@ export class PayPalAdapter implements PaymentService {
         throw new Error('PayPal payment currency does not match order currency')
       }
 
+      const failedStatuses = ['DECLINED', 'FAILED']
+
       return {
-        status: payment?.status === 'COMPLETED' ? 'success' : 'failed',
+        status: payment?.status === 'COMPLETED'
+          ? 'success'
+          : failedStatuses.includes(payment?.status) ? 'failed' : 'pending',
         transactionId: payment?.id || '',
         amount: parseFloat(payment?.amount?.value || '0'),
       }

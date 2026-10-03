@@ -1,12 +1,34 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useOrder } from '../contexts/OrderContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { formatPriceWithConversion } from '@shopvibe/shared';
-import { CheckoutFormData } from '../types/order';
+import { CheckoutFormData, ShippingAddress } from '../types/order';
+
+type AddressKind = 'shippingAddress' | 'billingAddress';
+
+const emptyAddress = (): ShippingAddress => ({
+  fullName: '',
+  street: '',
+  city: '',
+  state: '',
+  zipCode: '',
+  country: 'US',
+  phone: ''
+});
+
+const ADDRESS_FIELDS: Array<{ key: keyof ShippingAddress; label: string; type: string; autoComplete: string; wide?: boolean }> = [
+  { key: 'fullName', label: 'Full Name', type: 'text', autoComplete: 'name', wide: true },
+  { key: 'street', label: 'Street Address', type: 'text', autoComplete: 'street-address', wide: true },
+  { key: 'city', label: 'City', type: 'text', autoComplete: 'address-level2' },
+  { key: 'state', label: 'State / Region', type: 'text', autoComplete: 'address-level1' },
+  { key: 'zipCode', label: 'ZIP / Postal Code', type: 'text', autoComplete: 'postal-code' },
+  { key: 'country', label: 'Country', type: 'text', autoComplete: 'country' },
+  { key: 'phone', label: 'Phone', type: 'tel', autoComplete: 'tel', wide: true }
+];
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -23,33 +45,77 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
   const [paymentData, setPaymentData] = useState<{ orderId?: string; paymentId?: string; clientSecret?: string; approvalUrl?: string } | null>(null);
   const [formData, setFormData] = useState<CheckoutFormData>({
     email: user?.email || '',
-    shippingAddress: {
-      fullName: user?.name || '',
-      street: '123 Main St',
-      city: 'San Francisco',
-      state: 'CA',
-      zipCode: '94105',
-      country: 'US',
-      phone: '+1 (555) 123-4567'
-    },
-    billingAddress: {
-      fullName: user?.name || '',
-      street: '123 Main St',
-      city: 'San Francisco',
-      state: 'CA',
-      zipCode: '94105',
-      country: 'US',
-      phone: '+1 (555) 123-4567'
-    },
+    shippingAddress: { ...emptyAddress(), fullName: user?.name || '' },
+    billingAddress: { ...emptyAddress(), fullName: user?.name || '' },
     sameAsShipping: true,
     paymentMethod: 'stripe',
     saveInfo: false
   });
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // The modal mounts before the session loads, so fill in the account details once they arrive
+  useEffect(() => {
+    if (!user) return;
+
+    setFormData(prev => ({
+      ...prev,
+      email: user.email,
+      shippingAddress: { ...prev.shippingAddress, fullName: prev.shippingAddress.fullName || user.name },
+      billingAddress: { ...prev.billingAddress, fullName: prev.billingAddress.fullName || user.name }
+    }));
+  }, [user]);
+
+  const updateAddress = (kind: AddressKind, key: keyof ShippingAddress, value: string) => {
+    setFormData(prev => ({ ...prev, [kind]: { ...prev[kind], [key]: value } }));
+  };
+
+  const findMissingField = (kind: AddressKind): string | null => {
+    const missing = ADDRESS_FIELDS.find(field => !formData[kind][field.key]?.trim());
+    return missing ? missing.label : null;
+  };
+
+  const validateForm = (): string | null => {
+    const missingShipping = findMissingField('shippingAddress');
+    if (missingShipping) return `Please enter your shipping ${missingShipping.toLowerCase()}.`;
+
+    if (!formData.sameAsShipping) {
+      const missingBilling = findMissingField('billingAddress');
+      if (missingBilling) return `Please enter your billing ${missingBilling.toLowerCase()}.`;
+    }
+
+    return null;
+  };
+
+  const renderAddressFields = (kind: AddressKind) => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {ADDRESS_FIELDS.map(field => (
+        <div key={field.key} className={field.wide ? 'sm:col-span-2' : undefined}>
+          <label htmlFor={`${kind}-${field.key}`} className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
+          <input
+            id={`${kind}-${field.key}`}
+            type={field.type}
+            autoComplete={`${kind === 'shippingAddress' ? 'shipping' : 'billing'} ${field.autoComplete}`}
+            value={formData[kind][field.key] || ''}
+            onChange={(e) => updateAddress(kind, field.key, e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            required
+          />
+        </div>
+      ))}
+    </div>
+  );
 
   const orderSummary = calculateOrderSummary();
 
   const handleSubmitOrder = async () => {
+    const validationError = validateForm();
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
     try {
+      setFormError(null);
       setStep('processing');
       
       // Create the order
@@ -68,12 +134,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
         setStep('payment-initiated');
       } else {
         setStep('form');
-        alert('Failed to initialize payment. Please try again.');
+        setFormError('Failed to initialize payment. Please try again.');
       }
     } catch (error) {
       console.error('Order submission failed:', error);
       setStep('form');
-      alert('Failed to create order. Please try again.');
+      setFormError(error instanceof Error ? error.message : 'Failed to create order. Please try again.');
     }
   };
 
@@ -81,6 +147,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
     if (!paymentData?.paymentId || !paymentData?.orderId) return;
 
     try {
+      setFormError(null);
       setStep('processing');
       
       // For demo purposes, we simulate payment completion here
@@ -97,18 +164,20 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
       if (verified) {
         setStep('success');
       } else {
-        setStep('form');
-        alert('Payment verification failed. Please contact support.');
+        // Stay on the payment step so the same order can be retried
+        setStep('payment-initiated');
+        setFormError('Payment has not been completed yet, so the order could not be confirmed.');
       }
     } catch (error) {
       console.error('Payment confirmation failed:', error);
-      setStep('form');
-      alert('Payment verification failed. Please try again.');
+      setStep('payment-initiated');
+      setFormError('Payment verification failed. Please try again.');
     }
   };
 
   const handleClose = () => {
     setStep('form');
+    setFormError(null);
     setPaymentData(null);
     onClose();
   };
@@ -139,35 +208,48 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
           <div className="p-6">
             {step === 'form' && (
               <div className="space-y-6">
+                {formError && (
+                  <div role="alert" className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3">
+                    {formError}
+                  </div>
+                )}
                 {/* Customer Info */}
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Customer Information</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                      <input
-                        type="text"
-                        value={formData.shippingAddress.fullName}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          shippingAddress: { ...prev.shippingAddress, fullName: e.target.value }
-                        }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
+                  <div>
+                    <label htmlFor="checkout-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input
+                      id="checkout-email"
+                      type="email"
+                      value={formData.email}
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Order updates are sent to your account email.</p>
                   </div>
+                </div>
+
+                {/* Shipping Address */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Shipping Address</h3>
+                  {renderAddressFields('shippingAddress')}
+                </div>
+
+                {/* Billing Address */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Billing Address</h3>
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.sameAsShipping}
+                      onChange={(e) => setFormData(prev => ({ ...prev, sameAsShipping: e.target.checked }))}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">Same as shipping address</span>
+                  </label>
+                  {!formData.sameAsShipping && (
+                    <div className="mt-4">{renderAddressFields('billingAddress')}</div>
+                  )}
                 </div>
 
                 {/* Payment Method */}
@@ -281,13 +363,19 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 </div>
 
+                {formError && (
+                  <div role="alert" className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3 mb-6">
+                    {formError}
+                  </div>
+                )}
+
                 <p className="text-sm text-gray-500 mb-6">
                   For this demo, click &quot;Confirm Payment&quot; to simulate successful payment completion.
                 </p>
 
                 <div className="flex space-x-4">
                   <button
-                    onClick={() => setStep('form')}
+                    onClick={() => { setFormError(null); setStep('form'); }}
                     className="flex-1 px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     Cancel

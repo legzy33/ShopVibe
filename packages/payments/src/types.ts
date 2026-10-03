@@ -19,7 +19,8 @@ export interface CapturePaymentParams {
 }
 
 export interface CapturePaymentResponse {
-  status: 'success' | 'failed'
+  // 'pending' means the provider has not reached a final outcome yet
+  status: 'success' | 'failed' | 'pending'
   transactionId: string
   amount: number
 }

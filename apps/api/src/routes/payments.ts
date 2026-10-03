@@ -111,10 +111,10 @@ router.post('/verify', authenticate, async (req: Request, res: Response, next: N
       });
     }
 
-    if (order.paymentStatus !== 'PENDING') {
+    if (order.status !== 'PENDING' || order.paymentStatus !== 'PENDING') {
       return res.status(400).json({
         error: 'Order is not awaiting payment',
-        message: `Payment status is ${order.paymentStatus}.`
+        message: `Order status is ${order.status}, payment status is ${order.paymentStatus}.`
       });
     }
 
@@ -147,6 +147,13 @@ router.post('/verify', authenticate, async (req: Request, res: Response, next: N
         transactionId: verificationResult.transactionId,
         amount: verificationResult.amount,
         message: 'Payment verified and order confirmed'
+      });
+    } else if (verificationResult.pending) {
+      return res.status(409).json({
+        success: false,
+        pending: true,
+        error: 'Payment not completed',
+        message: 'The payment has not been completed yet. Please finish paying and try again.'
       });
     } else {
       return res.status(400).json({

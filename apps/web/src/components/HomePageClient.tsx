@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { ProductCard } from './ProductCard'
 import { Header } from './Header'
 import { AuthModal } from './AuthModal'
@@ -39,7 +39,19 @@ function HomeContent({ initialProducts }: HomePageClientProps) {
     sortBy?: 'name' | 'price' | 'rating' | 'createdAt';
     sortOrder?: 'asc' | 'desc';
   }>({})
-  const { products, loading, error } = useProducts(searchFilters, initialProducts)
+  const [page, setPage] = useState(1)
+  const { products, loading, error, pagination } = useProducts({ ...searchFilters, page }, initialProducts)
+
+  // A new search or filter starts again from the first page
+  const handleFiltersChanged = useCallback((filters: typeof searchFilters) => {
+    setSearchFilters(filters)
+    setPage(1)
+  }, [])
+
+  const goToPage = (nextPage: number) => {
+    setPage(nextPage)
+    document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
   const [checkoutModal, setCheckoutModal] = useState(false)
   const [selectedProductForReview, setSelectedProductForReview] = useState<string | null>(null)
   const [showOrderHistory, setShowOrderHistory] = useState(false)
@@ -99,7 +111,7 @@ function HomeContent({ initialProducts }: HomePageClientProps) {
         <main id="products" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-6">Our Collection</h2>
-            <ProductSearch onFiltersChanged={setSearchFilters} />
+            <ProductSearch onFiltersChanged={handleFiltersChanged} />
           </div>
 
           {loading && (
@@ -125,11 +137,12 @@ function HomeContent({ initialProducts }: HomePageClientProps) {
             <>
               <div className="mb-6 flex justify-between items-center">
                 <div className="text-sm text-gray-600 bg-white px-3 py-1 rounded-full shadow-sm">
-                  Showing <span className="font-semibold">{products.length}</span> products
+                  Showing <span className="font-semibold">{products.length}</span>
+                  {pagination ? <> of <span className="font-semibold">{pagination.totalCount}</span></> : null} products
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mb-16">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mb-8">
                 {products.map((product) => (
                   <ProductCard
                     key={product.id}
@@ -140,6 +153,28 @@ function HomeContent({ initialProducts }: HomePageClientProps) {
                   />
                 ))}
               </div>
+
+              {pagination && pagination.totalPages > 1 && (
+                <div className="flex justify-center items-center gap-4 mb-16">
+                  <button
+                    onClick={() => goToPage(page - 1)}
+                    disabled={!pagination.hasPrev}
+                    className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-gray-600">
+                    Page <span className="font-semibold">{pagination.page}</span> of <span className="font-semibold">{pagination.totalPages}</span>
+                  </span>
+                  <button
+                    onClick={() => goToPage(page + 1)}
+                    disabled={!pagination.hasNext}
+                    className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </>
           )}
 

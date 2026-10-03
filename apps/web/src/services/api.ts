@@ -1,6 +1,13 @@
 // API service for connecting frontend to backend
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
+export class ApiError extends Error {
+  constructor(message: string, public status: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 class ApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
@@ -27,7 +34,7 @@ class ApiService {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        throw new ApiError(errorData.error || `HTTP error! status: ${response.status}`, response.status);
       }
 
       return await response.json();

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiService } from '../services/api';
 import { mapApiProduct } from '../services/productTransforms';
 import { Product } from '../types/product';
@@ -38,22 +38,32 @@ export function useProducts(options: UseProductsOptions = {}, initialProducts: P
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<UseProductsReturn['pagination']>(null);
 
+  const latestRequest = useRef(0);
+
   const fetchProducts = async () => {
+    const requestId = ++latestRequest.current;
+
     try {
       setLoading(products.length === 0);
       setError(null);
       
       const response = await apiService.getProducts(options);
+
+      // A newer search or page change has superseded this request
+      if (requestId !== latestRequest.current) return;
       
       const transformedProducts: Product[] = response.data.map(mapApiProduct);
       
       setProducts(transformedProducts);
       setPagination(response.pagination);
     } catch (err) {
+      if (requestId !== latestRequest.current) return;
       console.error('Failed to fetch products:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch products');
     } finally {
-      setLoading(false);
+      if (requestId === latestRequest.current) {
+        setLoading(false);
+      }
     }
   };
 

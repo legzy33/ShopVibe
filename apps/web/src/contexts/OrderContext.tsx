@@ -11,6 +11,8 @@ interface OrderContextType {
   currentOrder: Order | null;
   isCheckingOut: boolean;
   isLoading: boolean;
+  hasMoreOrders: boolean;
+  loadMoreOrders: () => Promise<void>;
   checkoutError: string | null;
   // Checkout functions
   createOrder: (formData: CheckoutFormData) => Promise<Order>;
@@ -27,6 +29,40 @@ interface OrderContextType {
   clearCheckoutError: () => void;
   resetCurrentOrder: () => void;
 }
+
+type ApiOrder = Awaited<ReturnType<typeof apiService.getOrders>>['data'][number];
+
+const ORDERS_PAGE_SIZE = 10;
+
+const mapApiOrder = (order: ApiOrder): Order => ({
+  id: order.id,
+  userId: order.userId,
+  items: order.items.map(item => ({
+    id: item.id,
+    productId: item.productId,
+    productName: item.productName,
+    productImage: item.productImage,
+    quantity: item.quantity,
+    price: item.price,
+    variant: item.variant
+  })),
+  subtotal: order.subtotal,
+  tax: order.tax,
+  shipping: order.shipping,
+  total: order.total,
+  status: order.status.toLowerCase() as OrderStatus,
+  paymentStatus: order.paymentStatus.toLowerCase() as 'pending' | 'completed' | 'failed' | 'refunded',
+  paymentMethod: order.paymentMethod.toLowerCase() as 'stripe' | 'paypal' | 'apple_pay' | 'google_pay',
+  paymentIntentId: order.paymentIntentId || undefined,
+  shippingAddress: order.shippingAddress,
+  billingAddress: order.billingAddress,
+  trackingNumber: order.trackingNumber || undefined,
+  estimatedDelivery: order.estimatedDelivery ? new Date(order.estimatedDelivery) : undefined,
+  createdAt: new Date(order.createdAt),
+  updatedAt: new Date(order.updatedAt),
+  shippedAt: order.shippedAt ? new Date(order.shippedAt) : undefined,
+  deliveredAt: order.deliveredAt ? new Date(order.deliveredAt) : undefined,
+});
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
@@ -51,51 +87,49 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
   
   const { cart, refreshCart } = useCart();
   const { user, isAuthenticated } = useAuth();
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [hasMoreOrders, setHasMoreOrders] = useState(false);
+
+  // Reload the first page of orders
+  const refreshOrders = async () => {
+    const response = await apiService.getOrders({ page: 1, limit: ORDERS_PAGE_SIZE });
+    setOrders(response.data.map(mapApiOrder));
+    setOrdersPage(1);
+    setHasMoreOrders(response.pagination.hasNext);
+  };
+
+  const loadMoreOrders = async () => {
+    try {
+      setIsLoading(true);
+      const nextPage = ordersPage + 1;
+      const response = await apiService.getOrders({ page: nextPage, limit: ORDERS_PAGE_SIZE });
+      const olderOrders = response.data.map(mapApiOrder);
+
+      setOrders(prev => {
+        const knownIds = new Set(prev.map(order => order.id));
+        return [...prev, ...olderOrders.filter(order => !knownIds.has(order.id))];
+      });
+      setOrdersPage(nextPage);
+      setHasMoreOrders(response.pagination.hasNext);
+    } catch (err) {
+      console.error('Failed to load more orders:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Fetch orders from backend when user is authenticated
   useEffect(() => {
     const fetchOrders = async () => {
       if (!isAuthenticated || !user) {
         setOrders([]);
+        setHasMoreOrders(false);
         return;
       }
 
       try {
         setIsLoading(true);
-        const response = await apiService.getOrders();
-        
-        // Transform API response to Order type
-        const transformedOrders: Order[] = response.data.map(order => ({
-          id: order.id,
-          userId: order.userId,
-          items: order.items.map(item => ({
-            id: item.id,
-            productId: item.productId,
-            productName: item.productName,
-            productImage: item.productImage,
-            quantity: item.quantity,
-            price: item.price,
-            variant: item.variant
-          })),
-          subtotal: order.subtotal,
-          tax: order.tax,
-          shipping: order.shipping,
-          total: order.total,
-          status: order.status.toLowerCase() as OrderStatus,
-          paymentStatus: order.paymentStatus.toLowerCase() as 'pending' | 'completed' | 'failed' | 'refunded',
-          paymentMethod: order.paymentMethod.toLowerCase() as 'stripe' | 'paypal' | 'apple_pay' | 'google_pay',
-          paymentIntentId: order.paymentIntentId || undefined,
-          shippingAddress: order.shippingAddress,
-          billingAddress: order.billingAddress,
-          trackingNumber: order.trackingNumber || undefined,
-          estimatedDelivery: order.estimatedDelivery ? new Date(order.estimatedDelivery) : undefined,
-          createdAt: new Date(order.createdAt),
-          updatedAt: new Date(order.updatedAt),
-          shippedAt: order.shippedAt ? new Date(order.shippedAt) : undefined,
-          deliveredAt: order.deliveredAt ? new Date(order.deliveredAt) : undefined,
-        }));
-        
-        setOrders(transformedOrders);
+        await refreshOrders();
       } catch (err) {
         console.error('Failed to fetch orders:', err);
       } finally {
@@ -104,12 +138,13 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
     }
 
     fetchOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, user]);
 
   const calculateOrderSummary = (): OrderSummary => {
     const subtotal = cart.items.reduce((sum: number, item) => sum + (item.product.price * item.quantity), 0);
     const tax = subtotal * 0.08; // 8% tax
-    const shipping = subtotal >= 50 ? 0 : 9.99; // Free shipping over $50
+    const shipping = subtotal >= 50 ? 0 : 9.99; // Free shipping from $50
     const total = subtotal + tax + shipping;
 
     return {
@@ -166,7 +201,8 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
         updatedAt: new Date(response.order.updatedAt),
       };
 
-      setOrders(prev => [newOrder, ...prev]);
+      // The backend may hand back an existing unpaid order, so replace rather than duplicate
+      setOrders(prev => [newOrder, ...prev.filter(order => order.id !== newOrder.id)]);
       setCurrentOrder(newOrder);
       
       return newOrder;
@@ -219,38 +255,7 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
         await refreshCart();
 
         // Refresh orders to get updated status
-        const response = await apiService.getOrders();
-        const transformedOrders: Order[] = response.data.map(order => ({
-          id: order.id,
-          userId: order.userId,
-          items: order.items.map(item => ({
-            id: item.id,
-            productId: item.productId,
-            productName: item.productName,
-            productImage: item.productImage,
-            quantity: item.quantity,
-            price: item.price,
-            variant: item.variant
-          })),
-          subtotal: order.subtotal,
-          tax: order.tax,
-          shipping: order.shipping,
-          total: order.total,
-          status: order.status.toLowerCase() as OrderStatus,
-          paymentStatus: order.paymentStatus.toLowerCase() as 'pending' | 'completed' | 'failed' | 'refunded',
-          paymentMethod: order.paymentMethod.toLowerCase() as 'stripe' | 'paypal' | 'apple_pay' | 'google_pay',
-          paymentIntentId: order.paymentIntentId || undefined,
-          shippingAddress: order.shippingAddress,
-          billingAddress: order.billingAddress,
-          trackingNumber: order.trackingNumber || undefined,
-          estimatedDelivery: order.estimatedDelivery ? new Date(order.estimatedDelivery) : undefined,
-          createdAt: new Date(order.createdAt),
-          updatedAt: new Date(order.updatedAt),
-          shippedAt: order.shippedAt ? new Date(order.shippedAt) : undefined,
-          deliveredAt: order.deliveredAt ? new Date(order.deliveredAt) : undefined,
-        }));
-        
-        setOrders(transformedOrders);
+        await refreshOrders();
         return true;
       }
 
@@ -284,38 +289,7 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
       await apiService.updateOrderStatus(orderId, status.toUpperCase());
       
       // Refresh orders from backend
-      const response = await apiService.getOrders();
-      const transformedOrders: Order[] = response.data.map(order => ({
-        id: order.id,
-        userId: order.userId,
-        items: order.items.map(item => ({
-          id: item.id,
-          productId: item.productId,
-          productName: item.productName,
-          productImage: item.productImage,
-          quantity: item.quantity,
-          price: item.price,
-          variant: item.variant
-        })),
-        subtotal: order.subtotal,
-        tax: order.tax,
-        shipping: order.shipping,
-        total: order.total,
-        status: order.status.toLowerCase() as OrderStatus,
-        paymentStatus: order.paymentStatus.toLowerCase() as 'pending' | 'completed' | 'failed' | 'refunded',
-        paymentMethod: order.paymentMethod.toLowerCase() as 'stripe' | 'paypal' | 'apple_pay' | 'google_pay',
-        paymentIntentId: order.paymentIntentId || undefined,
-        shippingAddress: order.shippingAddress,
-        billingAddress: order.billingAddress,
-        trackingNumber: order.trackingNumber || undefined,
-        estimatedDelivery: order.estimatedDelivery ? new Date(order.estimatedDelivery) : undefined,
-        createdAt: new Date(order.createdAt),
-        updatedAt: new Date(order.updatedAt),
-        shippedAt: order.shippedAt ? new Date(order.shippedAt) : undefined,
-        deliveredAt: order.deliveredAt ? new Date(order.deliveredAt) : undefined,
-      }));
-      
-      setOrders(transformedOrders);
+      await refreshOrders();
     } catch (error) {
       console.error('Failed to update order status:', error);
       throw error;
@@ -343,42 +317,17 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
       return false;
     }
 
+    // Paid orders need a refund, which goes through support
+    if (order.paymentStatus === 'completed') {
+      setCheckoutError('Paid orders cannot be cancelled here. Please contact support.');
+      return false;
+    }
+
     try {
       await apiService.cancelOrder(orderId);
       
       // Refresh orders from backend
-      const response = await apiService.getOrders();
-      const transformedOrders: Order[] = response.data.map(order => ({
-        id: order.id,
-        userId: order.userId,
-        items: order.items.map(item => ({
-          id: item.id,
-          productId: item.productId,
-          productName: item.productName,
-          productImage: item.productImage,
-          quantity: item.quantity,
-          price: item.price,
-          variant: item.variant
-        })),
-        subtotal: order.subtotal,
-        tax: order.tax,
-        shipping: order.shipping,
-        total: order.total,
-        status: order.status.toLowerCase() as OrderStatus,
-        paymentStatus: order.paymentStatus.toLowerCase() as 'pending' | 'completed' | 'failed' | 'refunded',
-        paymentMethod: order.paymentMethod.toLowerCase() as 'stripe' | 'paypal' | 'apple_pay' | 'google_pay',
-        paymentIntentId: order.paymentIntentId || undefined,
-        shippingAddress: order.shippingAddress,
-        billingAddress: order.billingAddress,
-        trackingNumber: order.trackingNumber || undefined,
-        estimatedDelivery: order.estimatedDelivery ? new Date(order.estimatedDelivery) : undefined,
-        createdAt: new Date(order.createdAt),
-        updatedAt: new Date(order.updatedAt),
-        shippedAt: order.shippedAt ? new Date(order.shippedAt) : undefined,
-        deliveredAt: order.deliveredAt ? new Date(order.deliveredAt) : undefined,
-      }));
-      
-      setOrders(transformedOrders);
+      await refreshOrders();
       return true;
     } catch (error) {
       setCheckoutError(error instanceof Error ? error.message : 'Failed to cancel order');
@@ -399,6 +348,8 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
     currentOrder,
     isCheckingOut,
     isLoading,
+    hasMoreOrders,
+    loadMoreOrders,
     checkoutError,
     createOrder,
     processPayment,

@@ -50,6 +50,7 @@ interface VerifyPaymentParams {
 
 interface VerifyPaymentResponse {
   success: boolean;
+  pending?: boolean;
   transactionId: string;
   amount: number;
 }
@@ -172,8 +173,8 @@ export const verifyPayment = async (
         transactionId: captureResult.transactionId,
         amount: captureResult.amount
       };
-    } else {
-      // Payment failed
+    } else if (captureResult.status === 'failed') {
+      // The provider reported a definitive failure
       await prisma.order.update({
         where: { id: orderId },
         data: {
@@ -187,19 +188,19 @@ export const verifyPayment = async (
         transactionId: captureResult.transactionId,
         amount: 0
       };
+    } else {
+      // Not paid yet or still processing: leave the order awaiting payment
+      return {
+        success: false,
+        pending: true,
+        transactionId: captureResult.transactionId,
+        amount: 0
+      };
     }
   } catch (error) {
+    // An error here does not mean the payment failed (it may be a network
+    // problem), so the order is left awaiting payment and can be retried.
     console.error('Payment verification error:', error);
-    
-    // Mark payment as failed
-    await prisma.order.update({
-      where: { id: orderId },
-      data: {
-        paymentStatus: 'FAILED',
-        updatedAt: new Date()
-      }
-    });
-
     throw error;
   }
 };

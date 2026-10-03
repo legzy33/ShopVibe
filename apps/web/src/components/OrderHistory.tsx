@@ -8,7 +8,7 @@ import { formatPriceWithConversion } from '@shopvibe/shared';
 import { OrderStatus } from '../types/order';
 
 const OrderHistory: React.FC = () => {
-  const { getUserOrders, trackOrder, cancelOrder } = useOrder();
+  const { getUserOrders, trackOrder, cancelOrder, hasMoreOrders, loadMoreOrders, isLoading } = useOrder();
   const { user } = useAuth();
   const { currency } = useCurrency();
 
@@ -116,7 +116,7 @@ const OrderHistory: React.FC = () => {
                   <span className="capitalize">{order.status}</span>
                 </span>
                 
-                {(order.status === 'pending' || order.status === 'confirmed') && (
+                {(order.status === 'pending' || order.status === 'confirmed') && order.paymentStatus !== 'completed' && (
                   <button
                     onClick={() => handleCancelOrder(order.id)}
                     className="text-red-600 hover:text-red-700 text-sm font-medium"
@@ -229,6 +229,18 @@ const OrderHistory: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {hasMoreOrders && (
+        <div className="mt-6 text-center">
+          <button
+            onClick={loadMoreOrders}
+            disabled={isLoading}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? 'Loading...' : 'Load older orders'}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

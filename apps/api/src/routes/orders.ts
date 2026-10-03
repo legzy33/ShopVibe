@@ -208,50 +208,76 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
 
     const roundedSubtotal = roundCurrency(subtotal);
     const tax = roundCurrency(roundedSubtotal * 0.08); // 8% tax
-    const shipping = roundCurrency(roundedSubtotal > 50 ? 0 : 9.99); // Free shipping over $50
+    const shipping = roundCurrency(roundedSubtotal >= 50 ? 0 : 9.99); // Free shipping from $50
     const total = roundCurrency(roundedSubtotal + tax + shipping);
 
-    // Create order with items (status: PENDING until payment is verified)
-    const order = await prisma.order.create({
-      data: {
-        userId: user.id,
-        email: user.email,
-        status: 'PENDING', // Will be updated to CONFIRMED after payment verification
-        paymentStatus: 'PENDING', // Will be updated after payment
-        paymentMethod,
-        subtotal: roundedSubtotal,
-        tax,
-        shipping,
-        total,
-        shippingAddress: JSON.stringify(shippingAddress),
-        billingAddress: JSON.stringify(billingAddress),
-        notes: notes || null,
-        items: {
-          create: cartItems.map(item => ({
-            productId: item.productId,
-            productName: item.product.name,
-            productImage: item.product.imageUrl,
-            quantity: item.quantity,
-            price: item.product.price,
-            variant: item.variant
-          }))
-        }
-      },
-      include: {
-        items: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                imageUrl: true,
-                category: true
-              }
+    const orderData = {
+      status: 'PENDING', // Will be updated to CONFIRMED after payment verification
+      paymentStatus: 'PENDING', // Will be updated after payment
+      paymentMethod,
+      subtotal: roundedSubtotal,
+      tax,
+      shipping,
+      total,
+      shippingAddress: JSON.stringify(shippingAddress),
+      billingAddress: JSON.stringify(billingAddress),
+      notes: notes || null,
+      items: {
+        create: cartItems.map(item => ({
+          productId: item.productId,
+          productName: item.product.name,
+          productImage: item.product.imageUrl,
+          quantity: item.quantity,
+          price: item.product.price,
+          variant: item.variant
+        }))
+      }
+    };
+
+    const orderInclude = {
+      items: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              imageUrl: true,
+              category: true
             }
           }
         }
       }
+    };
+
+    // Reuse the user's unpaid order if there is one, so repeated checkout
+    // attempts do not pile up duplicate pending orders
+    const unpaidOrder = await prisma.order.findFirst({
+      where: {
+        userId: user.id,
+        status: 'PENDING',
+        paymentStatus: { in: ['PENDING', 'FAILED'] }
+      },
+      orderBy: { createdAt: 'desc' }
     });
+
+    let order;
+
+    if (unpaidOrder) {
+      // The totals may have changed, so any earlier payment intent is dropped
+      [, order] = await prisma.$transaction([
+        prisma.orderItem.deleteMany({ where: { orderId: unpaidOrder.id } }),
+        prisma.order.update({
+          where: { id: unpaidOrder.id },
+          data: { ...orderData, paymentIntentId: null },
+          include: orderInclude
+        })
+      ]);
+    } else {
+      order = await prisma.order.create({
+        data: { ...orderData, userId: user.id, email: user.email },
+        include: orderInclude
+      });
+    }
 
     // Parse JSON fields for response
     const formattedOrder = {
@@ -264,9 +290,9 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
       }))
     };
 
-    res.status(201).json({
+    res.status(unpaidOrder ? 200 : 201).json({
       success: true,
-      message: 'Order created successfully',
+      message: unpaidOrder ? 'Existing unpaid order updated' : 'Order created successfully',
       order: formattedOrder
     });
   } catch (error) {
@@ -380,6 +406,14 @@ router.post('/:id/cancel', authenticate, async (req: Request, res: Response, nex
       return res.status(400).json({
         error: `Cannot cancel order with status: ${order.status}`,
         message: 'Only pending or confirmed orders can be cancelled'
+      });
+    }
+
+    // Cancelling does not refund, so paid orders must go through support
+    if (order.paymentStatus === 'COMPLETED') {
+      return res.status(400).json({
+        error: 'Paid orders cannot be cancelled here',
+        message: 'This order has been paid. Please contact support to cancel it and arrange a refund.'
       });
     }
 
