@@ -35,3 +35,6 @@ Thumbs.db
 # Cache
 .turbo/
 .expo/ 
+
+# Local developer tools
+.tools/

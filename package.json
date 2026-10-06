@@ -27,7 +27,8 @@
     "typecheck:payments": "cd packages/payments && tsc --noEmit",
     "typecheck:shared": "cd packages/shared && tsc --noEmit",
     "lint:web": "cd apps/web && eslint . --ext .js,.jsx,.ts,.tsx",
-    "test:unit": "npm run test -w api"
+    "test:unit": "npm run test -w api",
+    "dev:webhooks": "cd apps/api && node --env-file=.env -e \"require('child_process').spawn('../../.tools/stripe',['listen','--forward-to','localhost:3002/api/payments/webhook','--events','payment_intent.succeeded'],{stdio:'inherit',env:{...process.env,STRIPE_API_KEY:process.env.STRIPE_SECRET_KEY}})\""
   },
   "devDependencies": {
     "turbo": "^1.10.16",
